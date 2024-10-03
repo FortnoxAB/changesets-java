@@ -1,7 +1,10 @@
 import groovy.xml.XmlSlurper
 
 def project = new XmlSlurper().parse(new File(basedir, 'pom.xml'))
-assert project.version == '2.0.0'
+assert project.version == '2.0.1-SNAPSHOT'
+
+String version = new File(basedir, '.changeset/VERSION').text;
+assert version == '2.0.0'
 
 def submodule1 = new XmlSlurper().parse(new File(basedir, 'module1/pom.xml'))
 // Check that the parent reference is updated to the new version
