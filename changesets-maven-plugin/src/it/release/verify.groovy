@@ -1,7 +1,16 @@
 import groovy.xml.XmlSlurper
 
-def project = new XmlSlurper().parse(new File(basedir, 'pom.xml'))
+import static org.assertj.core.api.Assertions.assertThat
 
-String version = new File(basedir, '.changeset/VERSION').text;
-assert version == '2.5.0'
-assert version == project.version.toString()
+String expectedVersion = '2.5.0';
+
+// The VERSION file should contain the correct version number
+assertThat(new File(basedir, '.changeset/VERSION'))
+        .content()
+        .isEqualTo(expectedVersion)
+
+// The root pom version should have the same value as the VERSION file
+def project = new XmlSlurper().parse(new File(basedir, 'pom.xml'))
+assertThat(project.version).isEqualTo(expectedVersion)
+
+true

@@ -61,7 +61,6 @@ public class PrepareMojo extends AbstractMojo {
 
 		// Set newVersion property to be used by versions:set
 		if (!newVersion.equals(currentVersion)) {
-			// TODO Make nicer and add tests
 			String pomVersion = Optional.ofNullable(Semver.coerce(newVersion))
 				.map(semver -> semver.withIncPatch().withPreRelease("SNAPSHOT").getVersion())
 				.orElseThrow(() -> new IllegalArgumentException("Cannot coerce \"%s\" into a semantic version.".formatted(currentVersion)));
@@ -71,7 +70,6 @@ public class PrepareMojo extends AbstractMojo {
 			PomUpdater.setProjectVersion(project.getFile(), pomVersion);
 
 			// Update submodules to reference the parent project with the new version
-			// TODO Do we need to check if the submodule has set it's version, so that also needs to be bumped?
 			List<String> modules = project.getModules();
 			modules.forEach(module -> {
 				File modulePom = baseDir.resolve(module).resolve("pom.xml").toFile();

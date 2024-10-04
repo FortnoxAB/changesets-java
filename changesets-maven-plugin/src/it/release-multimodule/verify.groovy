@@ -1,18 +1,25 @@
 import groovy.xml.XmlSlurper
 
+import static org.assertj.core.api.Assertions.assertThat
+
+String expectedVersion = '2.5.0';
+
+// The VERSION file should contain the correct version number
+assertThat(new File(basedir, '.changeset/VERSION'))
+        .content()
+        .isEqualTo(expectedVersion)
+
+// The root pom version should have the same value as the VERSION file
 def project = new XmlSlurper().parse(new File(basedir, 'pom.xml'))
-assert project.version == '2.5.0'
+assertThat(project.version).isEqualTo(expectedVersion)
 
-String version = new File(basedir, '.changeset/VERSION').text;
-assert version == project.version.toString()
-
+// Check that the parent reference is updated to the new version
 def submodule1 = new XmlSlurper().parse(new File(basedir, 'module1/pom.xml'))
-// Check that the parent reference is updated to the new version
-assert submodule1.parent.version == project.version
-// TODO Check that the submodule version is synced with parent too, if set?
+assertThat(submodule1.parent.version).isEqualTo(project.version)
 
+
+// Check that the parent reference is updated to the new version
 def submodule2 = new XmlSlurper().parse(new File(basedir, 'module2/pom.xml'))
-// Check that the parent reference is updated to the new version
-assert submodule2.parent.version == project.version
+assertThat(submodule2.parent.version).isEqualTo(project.version)
 
-// TODO Assert CHANGELOG file
+true
