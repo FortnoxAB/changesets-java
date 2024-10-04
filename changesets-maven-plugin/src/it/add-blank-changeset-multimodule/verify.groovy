@@ -1,3 +1,12 @@
+// Verify that exactly one markdown file was added to the .changeset folder
+def rootcount = new File(basedir, ".changeset")
+        .listFiles()
+        .findAll { it.name ==~ /.*\.md/ }
+        .size()
+
+assert rootcount == 1
+
+// Verify that no files were added to the .changeset folders of the submodules
 def module1count = new File(basedir, "./module1/.changeset/")
         .listFiles()
         .findAll { it.name ==~ /.*\.md/ }
@@ -12,13 +21,8 @@ def module2count = new File(basedir, "./module2/.changeset/")
 
 assert module2count == 0
 
-def rootcount = new File(basedir, ".changeset")
-        .listFiles()
-        .findAll { it.name ==~ /.*\.md/ }
-        .size()
 
-assert rootcount == 1
-
+// Verify that the created changeset file has the expected content
 def firstChangeset = new File(basedir, ".changeset")
         .listFiles()
         .findAll { it.name ==~ /.*\.md/ }

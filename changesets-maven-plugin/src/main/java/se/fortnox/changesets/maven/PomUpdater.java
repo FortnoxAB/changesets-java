@@ -17,9 +17,8 @@ import java.util.function.Consumer;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * Some of this stuff is blatantly copy/pasted from versions-maven-plugin, so that we can reuse some of their code for updating the pom files.
- *
- * TODO Needs tests
+ * Some of this is copy/pasted from <a href="https://www.mojohaus.org/versions/versions-maven-plugin/index.html">versions-maven-plugin</a>,
+ * so that we can reuse some of their code for updating the pom files.
  */
 public class PomUpdater {
 	private static final Logger LOG = getLogger(PomUpdater.class);
