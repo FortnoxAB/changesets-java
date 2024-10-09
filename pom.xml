@@ -185,4 +185,12 @@
             </plugins>
         </pluginManagement>
     </build>
+
+	<distributionManagement>
+		<repository>
+			<id>github</id>
+			<name>GitHub Fortnox Apache Maven Packages</name>
+			<url>https://maven.pkg.github.com/FortnoxAB/changesets-java</url>
+		</repository>
+	</distributionManagement>
 </project>
