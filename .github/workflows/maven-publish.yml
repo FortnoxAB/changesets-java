@@ -27,6 +27,8 @@ jobs:
         run: ./mvnw --batch-mode --no-transfer-progress package --file pom.xml
 
       - name: Publish to GitHub Packages Apache Maven
-        run: ./mvnw --batch-mode deploy -s $GITHUB_WORKSPACE/settings.xml
+        run: |
+          ./mvnw --batch-mode changesets:release
+          ./mvnw --batch-mode deploy -s $GITHUB_WORKSPACE/settings.xml
         env:
           GITHUB_TOKEN: ${{ github.token }}
