@@ -5,7 +5,7 @@ def firstChangeset = new File(basedir, ".changeset")
         .first()
 
 assert firstChangeset.text.equals("---\n" +
-        "\"com.fortnox.maven.it:add-blank-changelog\": patch\n" +
+        "\"add-blank-changelog\": patch\n" +
         "---\n" +
         "\n" +
         "thecontent");
