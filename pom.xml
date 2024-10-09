@@ -119,11 +119,6 @@
     <build>
         <pluginManagement>
             <plugins>
-                <plugin>
-                    <groupId>${project.groupId}</groupId>
-                    <artifactId>${project.artifactId}</artifactId>
-                    <version>${project.version}</version>
-                </plugin>
                 <!-- lock down plugins versions to avoid using Maven defaults (may be moved to parent pom) -->
                 <plugin>
                     <artifactId>maven-clean-plugin</artifactId>
@@ -184,12 +179,6 @@
                 </plugin>
             </plugins>
         </pluginManagement>
-	    <plugins>
-		    <plugin>
-			    <groupId>${project.groupId}</groupId>
-			    <artifactId>${project.artifactId}</artifactId>
-		    </plugin>
-	    </plugins>
     </build>
 
 	<distributionManagement>
