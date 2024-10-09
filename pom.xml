@@ -6,7 +6,7 @@
 
     <groupId>se.fortnox.changesets</groupId>
     <artifactId>changesets</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
         <module>changesets-java</module>
@@ -185,4 +185,12 @@
             </plugins>
         </pluginManagement>
     </build>
+
+	<distributionManagement>
+		<repository>
+			<id>github</id>
+			<name>GitHub Fortnox Apache Maven Packages</name>
+			<url>https://maven.pkg.github.com/FortnoxAB/changesets-java</url>
+		</repository>
+	</distributionManagement>
 </project>

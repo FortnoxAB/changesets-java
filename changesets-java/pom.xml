@@ -6,7 +6,7 @@
     <parent>
         <groupId>se.fortnox.changesets</groupId>
         <artifactId>changesets</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>0.1.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>changesets-java</artifactId>
