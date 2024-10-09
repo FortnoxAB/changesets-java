@@ -28,7 +28,7 @@ def firstChangeset = new File(basedir, ".changeset")
         .findAll { it.name ==~ /.*\.md/ }
         .first()
 assert firstChangeset.text.equals("---\n" +
-        "\"se.fortnox.maven.it:add-blank-changeset-multimodule\": patch\n" +
+        "\"add-blank-changeset-multimodule\": patch\n" +
         "---\n" +
         "\n" +
         "thecontent")
