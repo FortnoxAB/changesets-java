@@ -51,6 +51,10 @@
             <groupId>org.codehaus.mojo.versions</groupId>
             <artifactId>versions-common</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.vladsch.flexmark</groupId>
+            <artifactId>flexmark-all</artifactId>
+        </dependency>
 
 
         <dependency>
@@ -85,6 +89,20 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hosuaby</groupId>
+            <artifactId>inject-resources-core</artifactId>
+            <version>0.3.5</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hosuaby</groupId>
+            <artifactId>inject-resources-junit-jupiter</artifactId>
+            <version>0.3.5</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

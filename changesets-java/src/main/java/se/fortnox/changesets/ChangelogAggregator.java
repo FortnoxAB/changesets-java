@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class ChangelogAggregator {
 	 * creating it if it exists or prepending it to the existing content.
 	 *
 	 * @param packageName The package name to get changesets for
-	 * @param version The version number of the merged changes
+	 * @param version     The version number of the merged changes
 	 */
 	public void mergeChangesetsToChangelog(String packageName, String version) {
 		Path changesetsDir = this.baseDir.resolve(CHANGESET_DIR);
@@ -76,7 +77,7 @@ public class ChangelogAggregator {
 			.map(entry -> {
 				String level = entry.getKey().getPresentationString();
 				String levelChanges = entry.getValue().stream()
-					.map(change -> "- " + change.trim())
+					.map(ChangelogAggregator::formatChangeAsBulletPoint)
 					.sorted()
 					.collect(Collectors.joining("\n"));
 
@@ -87,13 +88,33 @@ public class ChangelogAggregator {
 			})
 			.collect(Collectors.joining("\n\n"));
 
-		return """
+		String markdown = """
 			# %s
 			
 			## %s
 			
 			%s
 			""".formatted(packageName, version, changes);
+
+		return MarkdownFormatter.format(markdown);
+	}
+
+	private static String formatChangeAsBulletPoint(String change) {
+		// Add the change as a bullet point, with leading dash and each subsequent line indented with two spaces
+		String firstLinePrefix = "- ";
+		String eachLinePrefix = "  ";
+		String lines = Arrays.stream(change.trim().split("\\R"))
+			.map(line -> {
+				// Do not indent empty lines
+				if (line.isBlank()) {
+					return line.trim();
+				}
+				return eachLinePrefix + line;
+			})
+			.collect(Collectors.joining("\n"))
+			.substring(eachLinePrefix.length());
+
+		return firstLinePrefix + lines;
 	}
 
 	private static Comparator<Map.Entry<Level, List<String>>> sortChangesets() {
