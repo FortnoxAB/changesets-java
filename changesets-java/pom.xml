@@ -102,7 +102,7 @@
         <dependency>
             <groupId>io.hosuaby</groupId>
             <artifactId>inject-resources-junit-jupiter</artifactId>
-            <version>0.3.5</version>
+            <version>1.0.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
