@@ -8,6 +8,48 @@
     <artifactId>changesets</artifactId>
     <version>0.1.1-SNAPSHOT</version>
     <packaging>pom</packaging>
+
+    <name>Changesets Java</name>
+    <description>
+        This is an attempt to bring the changesets (https://github.com/changesets/changesets) way of working to the Java ecosystem,
+        to enable easier management of changelogs and semantically versioned releases.
+    </description>
+    <url>https://github.com/FortnoxAB/changesets-java</url>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/license/mit</url>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <name>Niklas Gärdebrand</name>
+            <email>info@fortnox.se</email>
+            <organization>Fortnox AB</organization>
+            <organizationUrl>https://www.fortnox.se</organizationUrl>
+        </developer>
+        <developer>
+            <name>Magnus Persson</name>
+            <email>info@fortnox.se</email>
+            <organization>Fortnox AB</organization>
+            <organizationUrl>https://www.fortnox.se</organizationUrl>
+        </developer>
+    </developers>
+    <scm>
+        <connection>scm:git:git://github.com/FortnoxAB/changesets-java.git</connection>
+        <developerConnection>scm:git:ssh://github.com:FortnoxAB/changesets-java.git</developerConnection>
+        <url>https://github.com/FortnoxAB/changesets-java/tree/main</url>
+    </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://central.sonatype.com/artifact/se.fortnox.changesets/changesets-java</url>
+        </repository>
+    </distributionManagement>
+
     <modules>
         <module>changesets-java</module>
         <module>changesets-maven-plugin</module>
@@ -18,8 +60,8 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <maven.version>3.9.9</maven.version>
-        <junit-jupiter.version>5.11.2</junit-jupiter.version>
-	    <inject-resources.version>1.0.0</inject-resources.version>
+        <junit-jupiter.version>5.11.3</junit-jupiter.version>
+        <inject-resources.version>1.0.0</inject-resources.version>
     </properties>
 
     <dependencyManagement>
@@ -59,13 +101,11 @@
                 <artifactId>slf4j-api</artifactId>
                 <version>2.0.16</version>
             </dependency>
-            <!-- https://mvnrepository.com/artifact/org.semver4j/semver4j -->
             <dependency>
                 <groupId>org.semver4j</groupId>
                 <artifactId>semver4j</artifactId>
                 <version>5.4.1</version>
             </dependency>
-
             <dependency>
                 <groupId>org.codehaus.mojo.versions</groupId>
                 <artifactId>versions-common</artifactId>
@@ -160,11 +200,11 @@
                 </plugin>
                 <plugin>
                     <artifactId>maven-plugin-plugin</artifactId>
-                    <version>3.15.0</version>
+                    <version>3.15.1</version>
                 </plugin>
                 <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.5.1</version>
+                    <version>3.5.2</version>
                 </plugin>
                 <plugin>
                     <artifactId>maven-jar-plugin</artifactId>
@@ -196,13 +236,85 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 
-	<distributionManagement>
-		<repository>
-			<id>github</id>
-			<name>GitHub Fortnox Apache Maven Packages</name>
-			<url>https://maven.pkg.github.com/FortnoxAB/changesets-java</url>
-		</repository>
-	</distributionManagement>
+    <profiles>
+        <!-- Activates the plugins that are only needed when publishing artifacts -->
+        <profile>
+            <id>publish</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.10.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.6.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <!--
+                            autoPublish is set to false to allow a final review in Central before publishing, in case something goes wrong
+                            -->
+                            <autoPublish>false</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
