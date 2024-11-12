@@ -1,8 +1,7 @@
 name: Publish package to the Maven Central Repository
-on:
+
 # TODO This trigger should be automated to match merging release-PRs later on
-#  release:
-#    types: [created]
+on:
   workflow_dispatch
 
 jobs:
@@ -20,10 +19,13 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_SIGNING_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      - name: Set version
       - name: Publish package
+        # First install the artifact to make it available for use by the project
+        # Then prepare for release using changesets:release
+        # Finally deploy to Maven Central
         run: |
-          ./mvnw --batch-mode --no-transfer-progress changesets:release
+          ./mvnw --batch-mode --no-transfer-progress install
+          ./mvnw --batch-mode --no-transfer-progress se.fortnox.changesets:changesets-maven-plugin:release
           ./mvnw --batch-mode --no-transfer-progress -Ppublish deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
