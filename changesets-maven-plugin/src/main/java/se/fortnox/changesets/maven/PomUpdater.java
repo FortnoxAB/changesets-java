@@ -1,19 +1,19 @@
 package se.fortnox.changesets.maven;
 
 import org.codehaus.mojo.versions.api.PomHelper;
-import org.codehaus.mojo.versions.rewriting.ModifiedPomXMLEventReader;
-import org.codehaus.plexus.util.IOUtil;
-import org.codehaus.plexus.util.WriterFactory;
-import org.codehaus.stax2.XMLInputFactory2;
+import org.codehaus.mojo.versions.rewriting.MutableXMLStreamReader;
 import org.slf4j.Logger;
 
-import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
+import javax.xml.transform.TransformerException;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.util.function.Consumer;
 
+import static java.util.Optional.ofNullable;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -44,7 +44,7 @@ public class PomUpdater {
 	 * Set parent project version in a pom file
 	 *
 	 * @param outFile    The pom file to update
-	 * @param newVersion The new version to set the project parent reference to to
+	 * @param newVersion The new version to set the project parent reference to
 	 */
 	public static void setProjectParentVersion(File outFile, String newVersion) {
 		updatePom(outFile, newPom -> {
@@ -56,19 +56,17 @@ public class PomUpdater {
 		});
 	}
 
-	private static void updatePom(File outFile, Consumer<ModifiedPomXMLEventReader> updater) {
-		try {
-			StringBuilder   input        = PomHelper.readXmlFile(outFile);
-			XMLInputFactory inputFactory = XMLInputFactory2.newInstance();
-			inputFactory.setProperty(XMLInputFactory2.P_PRESERVE_LOCATION, Boolean.TRUE);
-			ModifiedPomXMLEventReader newPom = new ModifiedPomXMLEventReader(input, inputFactory, outFile.getAbsolutePath());
-
+	private static void updatePom(File outFile, Consumer<MutableXMLStreamReader> updater) {
+		try (MutableXMLStreamReader newPom = new MutableXMLStreamReader(outFile.toPath())) {
 			updater.accept(newPom);
-
-			try (Writer writer = WriterFactory.newXmlWriter(outFile)) {
-				IOUtil.copy(input.toString(), writer);
+			if(newPom.isModified()) {
+				try (Writer writer = Files.newBufferedWriter(
+					outFile.toPath(),
+					ofNullable(newPom.getEncoding()).map(Charset::forName).orElse(Charset.defaultCharset()))) {
+					writer.write(newPom.getSource());
+				}
 			}
-		} catch (XMLStreamException | IOException e) {
+		} catch (XMLStreamException | IOException | TransformerException e) {
 			LOG.error("Failed to update {}", outFile, e);
 		}
 	}
