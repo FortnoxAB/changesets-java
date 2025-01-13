@@ -12,6 +12,13 @@
     <artifactId>changesets-maven-plugin</artifactId>
     <packaging>maven-plugin</packaging>
 
+    <distributionManagement>
+        <site>
+            <id>github</id>
+            <url>scm:git:https://github.com/FortnoxAB/changesets-java.git</url>
+        </site>
+    </distributionManagement>
+
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
@@ -87,6 +94,32 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-site-plugin</artifactId>
+                <version>3.21.0</version>
+                <executions>
+                    <execution>
+                        <id>default-site</id>
+                        <goals>
+                            <goal>site</goal>
+                            <goal>stage</goal>
+                        </goals>
+                        <phase>site</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <skip>false</skip>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-scm-publish-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <scmBranch>gh-pages</scmBranch>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -128,4 +161,20 @@
             </build>
         </profile>
     </profiles>
+
+	<reporting>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-plugin-report-plugin</artifactId>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>report</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+			</plugin>
+		</plugins>
+	</reporting>
 </project>
