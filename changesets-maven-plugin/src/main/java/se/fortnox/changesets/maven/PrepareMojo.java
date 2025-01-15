@@ -4,22 +4,20 @@ import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.logging.Logger;
 import org.semver4j.Semver;
 import se.fortnox.changesets.ChangelogAggregator;
 import se.fortnox.changesets.Changeset;
 import se.fortnox.changesets.ChangesetLocator;
 import se.fortnox.changesets.VersionCalculator;
+import se.fortnox.changesets.VersionFile;
 
+import javax.inject.Inject;
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Optional;
-
-import static se.fortnox.changesets.ChangesetWriter.CHANGESET_DIR;
 
 /**
  * Applies all changesets into the changelog and calculates the new version number.
@@ -28,8 +26,22 @@ import static se.fortnox.changesets.ChangesetWriter.CHANGESET_DIR;
  */
 @Mojo(name = "prepare", defaultPhase = LifecyclePhase.INITIALIZE)
 public class PrepareMojo extends AbstractMojo {
-	@Parameter(defaultValue = "${project}", readonly = true, required = true)
-	private org.apache.maven.project.MavenProject project;
+	private final org.apache.maven.project.MavenProject project;
+	private final VersionFile versionFile;
+	private final Logger logger;
+
+	@Inject
+	public PrepareMojo(MavenProject project, VersionFile versionFile, Logger logger) {
+		this.project = project;
+		this.versionFile = versionFile;
+		this.logger = logger;
+	}
+
+	/*
+	 * Set to true in order to just process changeset files, avoiding any changes to the POM(s).
+	 */
+	@Parameter(property = "useReleasePluginIntegration", defaultValue = "false")
+	protected boolean useReleasePluginIntegration = false;
 
 	public void execute() {
 		Path baseDir = project.getBasedir().toPath();
@@ -40,23 +52,25 @@ public class PrepareMojo extends AbstractMojo {
 		List<Changeset> changesets = changesetLocator.getChangesets(packageName);
 
 		if (changesets.isEmpty()) {
-			getLog().info("No changesets for package: " + packageName + " found in " + baseDir);
+			logger.info("No changesets for package: " + packageName + " found in " + baseDir);
 			return;
 		}
 
 		// Calculate new version
-		String currentVersion = getCurrentVersion();
+		String currentVersion = versionFile.currentVersion().orElse("0.0.0");;
 		String newVersion = VersionCalculator.getNewVersion(currentVersion, changesets);
-		getLog().info("Old version was " + currentVersion + ", will be updated to " + newVersion);
+		logger.info("Old version was " + currentVersion + ", will be updated to " + newVersion);
 
 		// Move changesets into CHANGELOG.md
 		ChangelogAggregator changelogAggregator = new ChangelogAggregator(baseDir);
 		changelogAggregator.mergeChangesetsToChangelog(packageName, newVersion);
 
-		try {
-			Files.writeString(project.getBasedir().toPath().resolve(CHANGESET_DIR).resolve("VERSION"), newVersion, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
+		// Advance to version deduced from changesets
+		versionFile.assignVersion(newVersion);
+
+		if(useReleasePluginIntegration) {
+			logger.info("Changesets processed, but not updating POMs due to useReleasePluginIntegration being set to true.");
+			return;
 		}
 
 		// Set newVersion property to be used by versions:set
@@ -66,30 +80,16 @@ public class PrepareMojo extends AbstractMojo {
 				.orElseThrow(() -> new IllegalArgumentException("Cannot coerce \"%s\" into a semantic version.".formatted(currentVersion)));
 
 
-			getLog().info("Updating " + project.getFile() + " to " + pomVersion);
+			logger.info("Updating " + project.getFile() + " to " + pomVersion);
 			PomUpdater.setProjectVersion(project.getFile(), pomVersion);
 
 			// Update submodules to reference the parent project with the new version
 			List<String> modules = project.getModules();
 			modules.forEach(module -> {
 				File modulePom = baseDir.resolve(module).resolve("pom.xml").toFile();
-				getLog().info("Updating submodule" + modulePom + " to " + pomVersion);
+				logger.info("Updating submodule" + modulePom + " to " + pomVersion);
 				PomUpdater.setProjectParentVersion(modulePom, pomVersion);
 			});
-		}
-	}
-
-	private String getCurrentVersion() {
-		try {
-			Path versionFile = project.getBasedir().toPath().resolve(CHANGESET_DIR).resolve("VERSION");
-			getLog().info("Reading version from " + versionFile);
-			return Files.readString(versionFile);
-
-		} catch (NoSuchFileException exception) {
-			return "0.0.0";
-
-		} catch (IOException e) {
-			throw new RuntimeException(e);
 		}
 	}
 }
