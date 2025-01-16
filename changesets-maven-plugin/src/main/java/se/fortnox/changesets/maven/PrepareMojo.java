@@ -10,12 +10,14 @@ import se.fortnox.changesets.Changeset;
 import se.fortnox.changesets.ChangesetLocator;
 import se.fortnox.changesets.VersionCalculator;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.Optional;
 
 import static se.fortnox.changesets.ChangesetWriter.CHANGESET_DIR;
 
@@ -55,6 +57,25 @@ public class PrepareMojo extends AbstractMojo {
 			Files.writeString(project.getBasedir().toPath().resolve(CHANGESET_DIR).resolve("VERSION"), newVersion, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
+		}
+
+		// Set newVersion property to be used by versions:set
+		if (!newVersion.equals(currentVersion)) {
+			String pomVersion = Optional.ofNullable(Semver.coerce(newVersion))
+				.map(semver -> semver.withIncPatch().withPreRelease("SNAPSHOT").getVersion())
+				.orElseThrow(() -> new IllegalArgumentException("Cannot coerce \"%s\" into a semantic version.".formatted(currentVersion)));
+
+
+			getLog().info("Updating " + project.getFile() + " to " + pomVersion);
+			PomUpdater.setProjectVersion(project.getFile(), pomVersion);
+
+			// Update submodules to reference the parent project with the new version
+			List<String> modules = project.getModules();
+			modules.forEach(module -> {
+				File modulePom = baseDir.resolve(module).resolve("pom.xml").toFile();
+				getLog().info("Updating submodule" + modulePom + " to " + pomVersion);
+				PomUpdater.setProjectParentVersion(modulePom, pomVersion);
+			});
 		}
 	}
 
