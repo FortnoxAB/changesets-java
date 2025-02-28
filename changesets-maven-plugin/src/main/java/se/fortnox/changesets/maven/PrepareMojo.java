@@ -31,6 +31,12 @@ public class PrepareMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${project}", readonly = true, required = true)
 	private org.apache.maven.project.MavenProject project;
 
+	/*
+	 * Set to true in order to just process changeset files, avoiding any changes to the POM(s).
+	 */
+	@Parameter(property = "useReleasePluginIntegration", defaultValue = "false")
+	protected boolean useReleasePluginIntegration = false;
+
 	public void execute() {
 		Path baseDir = project.getBasedir().toPath();
 		String packageName = project.getArtifactId();
@@ -60,7 +66,7 @@ public class PrepareMojo extends AbstractMojo {
 		}
 
 		// Set newVersion property to be used by versions:set
-		if (!newVersion.equals(currentVersion)) {
+		if (!newVersion.equals(currentVersion) && !useReleasePluginIntegration) {
 			String pomVersion = Optional.ofNullable(Semver.coerce(newVersion))
 				.map(semver -> semver.withIncPatch().withPreRelease("SNAPSHOT").getVersion())
 				.orElseThrow(() -> new IllegalArgumentException("Cannot coerce \"%s\" into a semantic version.".formatted(currentVersion)));
@@ -76,6 +82,9 @@ public class PrepareMojo extends AbstractMojo {
 				getLog().info("Updating submodule" + modulePom + " to " + pomVersion);
 				PomUpdater.setProjectParentVersion(modulePom, pomVersion);
 			});
+		}
+		if(useReleasePluginIntegration) {
+			getLog().info("Changesets processed, but not updating POMs due to useReleasePluginIntegration being set to true.");
 		}
 	}
 

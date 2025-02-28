@@ -1,4 +1,4 @@
-package se.fortnox.changesets.maven;
+package se.fortnox.changesets.maven.policy;
 
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.shared.release.policy.PolicyException;
