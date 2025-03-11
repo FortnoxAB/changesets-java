@@ -27,4 +27,10 @@ public class VersionCalculator {
 		}
 		return semanticVersion.getVersion();
 	}
+
+	public static String nextDevelopmentVersion(String actualVersion) {
+		return Optional.ofNullable(Semver.coerce(actualVersion))
+			.map(semver -> semver.withIncPatch().withPreRelease("SNAPSHOT").getVersion())
+			.orElseThrow(() -> new IllegalArgumentException("Cannot coerce \"%s\" into a semantic version.".formatted(actualVersion)));
+	}
 }
