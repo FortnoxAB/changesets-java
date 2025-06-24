@@ -2,6 +2,7 @@ package se.fortnox.changesets;
 
 import org.slf4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -31,10 +32,14 @@ public class ChangesetWriter {
 	}
 
 	public void writeChangeset(Changeset changeset) throws FileAlreadyExistsException {
-		writeChangeset(changeset.packageName(), changeset.level(), changeset.message());
+		writeChangeset(changeset.packageName(), changeset.level(), changeset.message(), changeset.file());
 	}
 
 	Path writeChangeset(String packageName, Level changeLevel, String message) throws FileAlreadyExistsException {
+		return writeChangeset(packageName, changeLevel, message, null);
+	}
+
+	Path writeChangeset(String packageName, Level changeLevel, String message, File file) throws FileAlreadyExistsException {
 		final String fileContent;
 		if(message == null) {
 			fileContent = """
@@ -62,6 +67,26 @@ public class ChangesetWriter {
 			}
 		}
 
+
+		Path changesetFile;
+		if (file != null) {
+			// TODO Add tests
+			changesetFile = file.toPath();
+		} else {
+			changesetFile = generateChangesetFilename(changesetsDir);
+		}
+
+		try {
+			LOG.info("Writing changeset to {}", changesetFile);
+			Files.writeString(changesetFile, fileContent, StandardOpenOption.CREATE_NEW);
+		} catch (IOException e) {
+			LOG.error("Failed to create new changeset", e);
+		}
+
+		return changesetFile;
+	}
+
+	private Path generateChangesetFilename(Path changesetsDir) throws FileAlreadyExistsException {
 		String newFileName = this.nameGenerator.humanId() + ".md";
 		Path changesetFile = changesetsDir.resolve(newFileName);
 
@@ -80,14 +105,6 @@ public class ChangesetWriter {
 				throw new FileAlreadyExistsException(string, null, "Failed to generate a unique name after %s attempts".formatted(attempt));
 			}
 		}
-
-		try {
-			LOG.info("Writing changeset to {}", changesetFile);
-			Files.writeString(changesetFile, fileContent, StandardOpenOption.CREATE_NEW);
-		} catch (IOException e) {
-			LOG.error("Failed to create new changeset", e);
-		}
-
 		return changesetFile;
 	}
 }
