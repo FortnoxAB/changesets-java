@@ -26,7 +26,6 @@ public class DependencyUpdatesParser {
 		String nodeName = parsed.getFirstChild().getNodeName();
 		if (!nodeName.equals("BulletList")) {
 			LOG.warn("Unexpected node type {}", nodeName);
-			System.out.println();
 			return List.of();
 		}
 
