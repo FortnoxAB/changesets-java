@@ -15,7 +15,7 @@ Due to the way automated dependency update bots like Dependabot and Renovate wor
 
 To help with this, we have added a feature to mark changesets as dependency update using the update type "dependency". This will make the changeset appear in a separate section in the changelog, and will be added as a single list of updates in the end of the released version.
 
-Dependencies that has been updated to new versions multiple times between releases will have each of the updates listed in the changelog.
+Dependencies that have been updated to new versions multiple times between releases will have each of the updates listed in the changelog.
 
 ```
 ---
