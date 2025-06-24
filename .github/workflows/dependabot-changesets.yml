@@ -13,7 +13,7 @@ jobs:
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'FortnoxAB/changesets-java'
     steps:
       - name: Dependabot metadata
-        id: metadata
+        id: dependabot-metadata
         uses: dependabot/fetch-metadata@v2
         with:
           skip-verification: true
@@ -22,4 +22,8 @@ jobs:
         run: |
             echo "dependency-names: ${{ steps.dependabot-metadata.outputs.dependency-names }}"
             echo "new-version: ${{ steps.dependabot-metadata.outputs.new-version }}"
-            echo "${{ toJSON(steps.metadata.outputs) }}"
+            echo "${{ toJSON(steps.dependabot-metadata.outputs) }}"
+          
+            # Fake adding a changeset so we see that it runs with the correct parameters
+            echo "./mvnw se.fortnox.changesets:changesets-maven-plugin:add -DchangesetLevel=dependency -DchangesetContent=\"- ${{ steps.dependabot-metadata.outputs.dependency-names }}: ${{ steps.dependabot-metadata.outputs.new-version }}\""
+          
