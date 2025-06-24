@@ -16,7 +16,23 @@ class MarkdownFormatterTest {
 
     @Test
     void shouldFormatDocumentAsExpected() {
-        assertThat(MarkdownFormatter.format(original)).isEqualTo(expected);
+	    String actual = MarkdownFormatter.format(original);
+	    assertThat(actual).isEqualTo(expected);
     }
 
+	/**
+	 * The double spaces at the end indicate that the following line should be indented as the current one and must be kept
+	 */
+	@Test
+	void shouldKeepMultilineBulletItems() {
+		String unformatted = """
+			- First line\s\s
+			  Second line\s\s
+			  Third line
+			
+			""";
+
+		String actual = MarkdownFormatter.format(unformatted);
+		assertThat(actual).isEqualTo(unformatted);
+	}
 }

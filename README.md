@@ -8,6 +8,24 @@ users recognize the ways of working and feel at home.
 
 This is it, at the moment. Stay tuned for more docs later on, thanks!
 
+
+
+## Dependency updates
+Due to the way automated dependency update bots like Dependabot and Renovate work, there is often a large influx of automated changesets that are not easy to merge into the normal changelog. They can also be the source of an unwanted amount of noise in the changelog.
+
+To help with this, we have added a feature to mark changesets as dependency update using the update type "dependency". This will make the changeset appear in a separate section in the changelog, and will be added as a single list of updates in the end of the released version.
+
+Dependencies that has been updated to new versions multiple times between releases will have each of the updates listed in the changelog.
+
+```
+---
+"changesets-java": dependency
+---
+
+- ch.qos.logback:logback-core: 1.5.12
+- com.google.errorprone:error_prone_annotations: 2.34.0
+```
+
 # Release Maven Plugin Integration
 
 To delegate versioning to the Release Maven Plugin, you can use the `ChangesetsVersionPolicy` together with the `useReleasePluginIntegration` flag:

@@ -19,6 +19,7 @@ import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 import static org.slf4j.LoggerFactory.getLogger;
 import static se.fortnox.changesets.ChangesetWriter.CHANGESET_DIR;
+import static se.fortnox.changesets.Level.DEPENDENCY;
 import static se.fortnox.changesets.Level.MAJOR;
 import static se.fortnox.changesets.Level.MINOR;
 import static se.fortnox.changesets.Level.PATCH;
@@ -27,9 +28,15 @@ public class ChangelogAggregator {
 	private static final Logger LOG = getLogger(ChangelogAggregator.class);
 	public static final String CHANGELOG_FILE = "CHANGELOG.md";
 	private final Path baseDir;
+	private final DependencyUpdatesParser dependencyUpdatesParser;
 
 	public ChangelogAggregator(Path baseDir) {
+		this(baseDir, new DependencyUpdatesParser());
+	}
+
+	public ChangelogAggregator(Path baseDir, DependencyUpdatesParser dependencyUpdatesParser) {
 		this.baseDir = baseDir;
+		this.dependencyUpdatesParser = dependencyUpdatesParser;
 	}
 
 	/**
@@ -38,23 +45,26 @@ public class ChangelogAggregator {
 	 *
 	 * @param packageName The package name to get changesets for
 	 * @param version     The version number of the merged changes
+	 * @return
 	 */
-	public void mergeChangesetsToChangelog(String packageName, String version) {
+	public Path mergeChangesetsToChangelog(String packageName, String version) {
 		Path changesetsDir = this.baseDir.resolve(CHANGESET_DIR);
 
 		ChangesetLocator changesetLocator = new ChangesetLocator(this.baseDir);
 		List<Changeset> changesets = changesetLocator.getChangesets(packageName);
 		if (changesets.isEmpty()) {
 			LOG.info("No changesets found in {}", this.baseDir);
-			return;
+			return changesetsDir;
 		}
 
 		String changelog = generateChangelog(packageName, version, changesets);
 
+		Path changelogFile;
 		try {
-			writeChangelog(changelog);
+			changelogFile = writeChangelog(changelog);
 		} catch (ChangelogException exception) {
 			LOG.error("Failed to update changelog at {}", changesetsDir, exception);
+			return changesetsDir;
 		}
 
 		changesets.forEach(changeset -> {
@@ -65,9 +75,10 @@ public class ChangelogAggregator {
 				LOG.error("Failed to delete {}", file, e);
 			}
 		});
+		return changelogFile;
 	}
 
-	private static String generateChangelog(String packageName, String version, List<Changeset> changesets) {
+	private String generateChangelog(String packageName, String version, List<Changeset> changesets) {
 		String changes = changesets
 			.stream()
 			.collect(groupingBy(Changeset::level, mapping(Changeset::message, toList())))
@@ -75,16 +86,14 @@ public class ChangelogAggregator {
 			.stream()
 			.sorted(sortChangesets())
 			.map(entry -> {
-				String level = entry.getKey().getPresentationString();
-				String levelChanges = entry.getValue().stream()
-					.map(ChangelogAggregator::formatChangeAsBulletPoint)
-					.sorted()
-					.collect(Collectors.joining("\n"));
+				Level level = entry.getKey();
+				String levelString = level.getPresentationString();
+				String levelChanges = formatChangeset(level, entry.getValue());
 
 				return """
-					### %s Changes
+					### %s
 					
-					%s""".formatted(level, levelChanges);
+					%s""".formatted(levelString, levelChanges);
 			})
 			.collect(Collectors.joining("\n\n"));
 
@@ -97,6 +106,23 @@ public class ChangelogAggregator {
 			""".formatted(packageName, version, changes);
 
 		return MarkdownFormatter.format(markdown);
+	}
+
+	private String formatChangeset(Level level, List<String> changes) {
+		if (level == DEPENDENCY) {
+			// Extract all dependencies from each dependency change and put them into a single list
+			return changes.stream()
+				.flatMap(change -> dependencyUpdatesParser.parseDependencyChangeset(change).stream())
+				.map(ChangelogAggregator::formatChangeAsBulletPoint)
+				.distinct()
+				.sorted()
+				.collect(Collectors.joining("\n"));
+		}
+
+		return changes.stream()
+			.map(ChangelogAggregator::formatChangeAsBulletPoint)
+			.sorted()
+			.collect(Collectors.joining("\n"));
 	}
 
 	private static String formatChangeAsBulletPoint(String change) {
@@ -118,7 +144,7 @@ public class ChangelogAggregator {
 	}
 
 	private static Comparator<Map.Entry<Level, List<String>>> sortChangesets() {
-		List<Level> levelOrder = List.of(MAJOR, MINOR, PATCH);
+		List<Level> levelOrder = List.of(MAJOR, MINOR, PATCH, DEPENDENCY);
 
 		return (o1, o2) -> {
 			// Sort levels in the order specified in levelOrder
@@ -135,9 +161,10 @@ public class ChangelogAggregator {
 	 * If the file already exists, trim the first header before prepending it with the new changelog entries.
 	 *
 	 * @param changelog The new changelog content
+	 * @return
 	 * @throws ChangelogException Thrown if file operations on the existing or new file are unsuccessful
 	 */
-	private void writeChangelog(String changelog) throws ChangelogException {
+	private Path writeChangelog(String changelog) throws ChangelogException {
 		Path changelogFile = this.baseDir.resolve(CHANGELOG_FILE);
 
 		if (Files.exists(changelogFile)) {
@@ -146,6 +173,7 @@ public class ChangelogAggregator {
 
 		try {
 			Files.writeString(changelogFile, changelog, TRUNCATE_EXISTING, CREATE);
+			return changelogFile;
 
 		} catch (IOException e) {
 			throw new ChangelogException("Failed to write " + changelogFile, e);
