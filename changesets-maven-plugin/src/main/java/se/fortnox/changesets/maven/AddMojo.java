@@ -61,7 +61,7 @@ public class AddMojo extends AbstractMojo {
 		}
 
 		try {
-			var changeset = new Changeset("%s".formatted(project.getArtifactId()), level, changesetContent, changesetFile);
+			var changeset = new Changeset(project.getArtifactId(), level, changesetContent, changesetFile);
 			changesetWriter.writeChangeset(changeset);
 		} catch (FileAlreadyExistsException e) {
 			throw new RuntimeException(e);
