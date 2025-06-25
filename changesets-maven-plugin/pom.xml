@@ -168,6 +168,8 @@
 							<settingsFile>src/it/settings.xml</settingsFile>
 							<addTestClassPath>true</addTestClassPath>
 							<showErrors>true</showErrors>
+							<!-- Skip these when skipping tests -->
+							<skipInvocation>${skipTests}</skipInvocation>
 							<goals>
 								<goal>clean</goal>
 								<goal>test-compile</goal>

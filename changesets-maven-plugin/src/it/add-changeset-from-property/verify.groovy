@@ -1,11 +1,32 @@
-// Verify that exactly one markdown file was added to the .changeset folder and has the expected content
-def firstChangeset = new File(basedir, ".changeset")
+def changesetFiles = new File(basedir, ".changeset")
         .listFiles()
         .findAll { it.name ==~ /.*\.md/ }
-        .first()
+assert changesetFiles.size() == 3
 
-assert firstChangeset.text.equals("---\n" +
+
+assert new File(basedir, ".changeset/patch.md").text.equals("---\n" +
         "\"add-blank-changelog\": patch\n" +
         "---\n" +
         "\n" +
-        "thecontent");
+        "Patch change");
+
+assert new File(basedir, ".changeset/minor.md").text.equals("---\n" +
+        "\"add-blank-changelog\": minor\n" +
+        "---\n" +
+        "\n" +
+        "Minor change");
+
+assert new File(basedir, ".changeset/major.md").text.equals("---\n" +
+        "\"add-blank-changelog\": major\n" +
+        "---\n" +
+        "\n" +
+        "Major change");
+
+// See invoker.properties for the dependency change details
+/*
+assert new File(basedir, ".changeset/dependency.md").text.equals("---\n" +
+        "\"add-blank-changelog\": dependency\n" +
+        "---\n" +
+        "\n" +
+        "Dependency change");
+*/
