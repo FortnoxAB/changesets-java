@@ -20,7 +20,14 @@ public class MarkdownFormatter {
 	public static String format(String markdown) {
 		MutableDataSet formatOptions = new MutableDataSet();
 		// Clean up whitespaces in different ways
-		formatOptions.set(FORMAT_FLAGS, LineAppendable.F_FORMAT_ALL);
+		// Do not use F_TRIM_TRAILING_WHITESPACE as it is required for line breaks in bullet lists
+		int format = LineAppendable.F_CONVERT_TABS |
+			// LineAppendable.F_COLLAPSE_WHITESPACE;
+			// LineAppendable.F_TRIM_TRAILING_WHITESPACE |
+			LineAppendable.F_TRIM_LEADING_WHITESPACE |
+			LineAppendable.F_TRIM_LEADING_EOL
+				;
+		formatOptions.set(FORMAT_FLAGS, format);
 
         // Limit line lengths
 		formatOptions.set(RIGHT_MARGIN, 120);
