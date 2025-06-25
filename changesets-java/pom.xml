@@ -9,6 +9,7 @@
 		<version>0.2.1-SNAPSHOT</version>
 	</parent>
 
+	<name>Changesets Java</name>
 	<artifactId>changesets-java</artifactId>
 	<description>Java library for handling of changesets</description>
 
