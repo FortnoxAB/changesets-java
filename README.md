@@ -8,7 +8,7 @@ users recognize the ways of working and feel at home.
 
 This is it, at the moment. Stay tuned for more docs later on, thanks!
 
-# Release Maven Plugin Integration
+## Release Maven Plugin Integration
 
 To delegate versioning to the Release Maven Plugin, you can use the `ChangesetsVersionPolicy` together with the `useReleasePluginIntegration` flag:
 
