@@ -1,29 +1,30 @@
-# Enable auto-merge for Dependabot PRs for minor and patch
-# Based off of https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions#enable-auto-merge-on-a-pull-request
-name: Create changesets for Dependabot
-on: pull_request
+# Add changesets for Dependabot PRs
+name: Dependabot Changesets
+on:
+  pull_request: {}
 
 permissions:
+  pull-requests: read
   contents: write
-  pull-requests: write
 
 jobs:
-  dependabot:
+  generate-changeset:
     runs-on: ubuntu-latest
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'FortnoxAB/changesets-java'
     steps:
-      - name: Dependabot metadata
-        id: dependabot-metadata
-        uses: dependabot/fetch-metadata@v2
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          skip-verification: true
-      - name: Debug
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - uses: FortnoxAB/changesets-java-dependabot-action@main
+
+      - name: Validate
         shell: bash
         run: |
-            echo "dependency-names: ${{ steps.dependabot-metadata.outputs.dependency-names }}"
-            echo "new-version: ${{ steps.dependabot-metadata.outputs.new-version }}"
-            echo "${{ toJSON(steps.dependabot-metadata.outputs) }}"
-          
-            # Fake adding a changeset so we see that it runs with the correct parameters
-            echo "./mvnw se.fortnox.changesets:changesets-maven-plugin:add -DchangesetLevel=dependency -DchangesetContent=\"- ${{ steps.dependabot-metadata.outputs.dependency-names }}: ${{ steps.dependabot-metadata.outputs.new-version }}\""
-          
+          ls -l .changeset
+          git status
