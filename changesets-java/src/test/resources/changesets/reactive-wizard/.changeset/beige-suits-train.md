@@ -1,0 +1,20 @@
+---
+"reactivewizard-parent": dependency
+---
+- com.github.jnr:jnr-posix: 3.1.20
+- io.swagger.core.v3:swagger-annotations: 2.2.27
+- net.bytebuddy:byte-buddy: 1.15.11
+- org.apache.logging.log4j:log4j-core: 2.24.3
+- org.apache.logging.log4j:log4j-jul: 2.24.3
+- org.apache.logging.log4j:log4j-core: 2.24.3
+- org.apache.logging.log4j:log4j-api: 2.24.3
+- org.apache.logging.log4j:log4j-layout-template-json: 2.24.3
+- org.apache.logging.log4j:log4j-slf4j2-impl: 2.24.3
+- org.hibernate.validator:hibernate-validator: 8.0.2.Final
+- org.junit:junit-bom: 5.11.4
+- com.google.guava:guava: 33.4.0-jre
+- io.projectreactor:reactor-bom: 2024.0.1
+- io.zipkin.reporter2:zipkin-reporter: 3.4.3
+- io.micrometer:micrometer-observation: 1.14.2
+- io.opentelemetry:opentelemetry-bom: 1.45.0
+- org.apache.commons:commons-text: 1.13.0
