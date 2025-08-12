@@ -2,4 +2,4 @@
 "changesets": patch
 ---
 
-- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml: 
+- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml: 2.19.2
