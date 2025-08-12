@@ -1,0 +1,33 @@
+---
+"reactivewizard-parent": dependency
+---
+- io.swagger.core.v3:swagger-annotations: 2.2.26
+- org.bouncycastle:bcpkix-jdk18on: 1.79
+- net.bytebuddy:byte-buddy: 1.15.10
+- com.mattbertolini:liquibase-slf4j: 5.1.0
+- io.github.classgraph:classgraph: 4.8.179
+- org.apache.logging.log4j:log4j-core: 2.24.2
+- org.apache.logging.log4j:log4j-jul: 2.24.2
+- org.apache.logging.log4j:log4j-core: 2.24.2
+- org.apache.logging.log4j:log4j-api: 2.24.2
+- org.apache.logging.log4j:log4j-layout-template-json: 2.24.2
+- org.apache.logging.log4j:log4j-slf4j2-impl: 2.24.2
+- org.junit:junit-bom: 5.11.3
+- com.fasterxml.jackson:jackson-bom: 2.18.2
+- com.microsoft.playwright:playwright: 1.49.0
+- io.zipkin.zipkin2:zipkin: 3.4.3
+- ch.qos.logback:logback-classic: 1.5.12
+- ch.qos.logback:logback-core: 1.5.12
+- io.opentelemetry:opentelemetry-bom: 1.44.1
+- org.jetbrains.kotlin:kotlin-bom: 2.1.0
+- com.github.luben:zstd-jni: 1.5.6-8
+- org.bouncycastle:bcprov-jdk18on: 1.79
+- com.google.errorprone:error_prone_annotations: 2.36.0
+- io.lettuce:lettuce-core: 6.5.1.RELEASE
+- org.checkerframework:checker-qual: 3.48.3
+- io.dropwizard.metrics:metrics-caffeine: 4.2.29
+- io.dropwizard.metrics:metrics-core: 4.2.29
+- commons-io:commons-io: 2.18.0
+- org.testcontainers:junit-jupiter: 1.20.4
+- org.testcontainers:testcontainers: 1.20.4
+- org.testcontainers:postgresql: 1.20.4

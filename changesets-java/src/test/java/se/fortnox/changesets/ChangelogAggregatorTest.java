@@ -256,4 +256,48 @@ class ChangelogAggregatorTest {
 				
 				""");
 	}
+
+	@Test
+	void shouldAggregateDependencyUpdates(@TempDir Path tempDir) throws FileAlreadyExistsException {
+		ChangelogAggregator changelog = new ChangelogAggregator(tempDir);
+
+		ChangesetWriter changesetWriter = new ChangesetWriter(tempDir);
+		changesetWriter.writeChangeset(PACKAGE_NAME, Level.DEPENDENCY, "- Some dependency\n- Another dependency");
+		changesetWriter.writeChangeset(PACKAGE_NAME, Level.DEPENDENCY, "- Third dependency");
+		changesetWriter.writeChangeset(PACKAGE_NAME, Level.DEPENDENCY, " - Differently indented");
+		changesetWriter.writeChangeset(PACKAGE_NAME, Level.DEPENDENCY, "- Fourth dependency\n - Fifth dependency");
+		changesetWriter.writeChangeset(PACKAGE_NAME, Level.DEPENDENCY, "- Multiline dependency  \n  that should be kept as a single item");
+		changesetWriter.writeChangeset(PACKAGE_NAME, Level.DEPENDENCY, "- Multi  \nline");
+
+		assertThat(tempDir.resolve(ChangesetWriter.CHANGESET_DIR))
+			.exists()
+			.isDirectory()
+			.isDirectoryContaining(path -> path.toFile().getName().endsWith(".md"));
+
+		changelog.mergeChangesetsToChangelog(PACKAGE_NAME, "1.0.0");
+
+		assertThat(tempDir.resolve(CHANGELOG_FILE))
+			.exists()
+			.isRegularFile()
+			.content()
+			.isEqualTo("""
+				# my-package
+				
+				## 1.0.0
+				
+				### Dependency Updates
+				
+				- Another dependency
+				- Differently indented
+				- Fifth dependency
+				- Fourth dependency
+				- Multi\s\s
+				  line
+				- Multiline dependency\s\s
+				  that should be kept as a single item
+				- Some dependency
+				- Third dependency
+				
+				""");
+	}
 }
