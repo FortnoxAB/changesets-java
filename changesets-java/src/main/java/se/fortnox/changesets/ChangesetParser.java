@@ -36,6 +36,7 @@ public class ChangesetParser {
 
 				// Translate to enum
 				Level level = switch (levelString) {
+					case "dependency" -> Level.DEPENDENCY;
 					case "patch" -> Level.PATCH;
 					case "minor" -> Level.MINOR;
 					case "major" -> Level.MAJOR;

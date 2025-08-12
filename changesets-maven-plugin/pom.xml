@@ -6,9 +6,10 @@
 	<parent>
 		<groupId>se.fortnox.changesets</groupId>
 		<artifactId>changesets</artifactId>
-		<version>0.1.1-SNAPSHOT</version>
+		<version>0.2.1-SNAPSHOT</version>
 	</parent>
 
+	<name>Changesets Java Maven Plugin</name>
 	<artifactId>changesets-maven-plugin</artifactId>
 	<packaging>maven-plugin</packaging>
 
@@ -161,7 +162,7 @@
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-invoker-plugin</artifactId>
-						<version>3.9.0</version>
+						<version>3.9.1</version>
 						<configuration>
 							<postBuildHookScript>verify</postBuildHookScript>
 							<localRepositoryPath>${project.build.directory}/local-repo</localRepositoryPath>

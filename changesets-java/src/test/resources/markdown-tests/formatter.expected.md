@@ -10,7 +10,9 @@
     - Sub bullet
     - Sub bullet 3
   - Third bullet
-- First line Second line Third line
+- First line  
+  Second line  
+  Third line
 - Hello friend
 - One line
 

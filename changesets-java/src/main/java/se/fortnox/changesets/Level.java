@@ -1,9 +1,10 @@
 package se.fortnox.changesets;
 
 public enum Level {
-	MAJOR("major", "Major"),
-	MINOR("minor", "Minor"),
-	PATCH("patch", "Patch");
+	MAJOR("major", "Major Changes"),
+	MINOR("minor", "Minor Changes"),
+	PATCH("patch", "Patch Changes"),
+	DEPENDENCY("dependency", "Dependency Updates");
 
 	private final String textValue;
 	private final String presentationString;
