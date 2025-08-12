@@ -1,5 +1,31 @@
 # changesets
 
+## 0.2.0
+
+### Minor Changes
+
+- Improved handling of multiline changesets, which previously would produce invalid bullet points.
+
+  This change also introduces a Markdown formatter function to clean up any easily fixed formatting issues.
+- Introduced more parameters for generating more flexible changesets using the add goal.
+
+  You can now create changesets with more prefilled info and with predictable names (useful for testing and dependabot).
+
+  The new parameters are `changesetLevel` and `changesetFile` (`changesetContent` was already available).
+
+  ```
+  mvn changesets:add -DchangesetLevel=patch -DchangesetContent="My change" -DchangesetFile=magic.md
+  ```
+- This change introduces a version policy (`ChangesetsVersionPolicy`) compatible with the Release Maven plugin, together
+  with a flag `useReleasePluginIntegration` (default `false`) on the `prepare` goal. Enabling this flag will disable
+  updating POM versions in `prepare` and only perform changeset processing. Updating versions in POMs can then be
+  delegated to the Release plugin, together with all the other facilities that plugin provides.
+
+### Patch Changes
+
+- Adapt for breaking changes of versions-common (introduced in #47).
+
+
 ## 0.1.0
 
 ### Minor Changes

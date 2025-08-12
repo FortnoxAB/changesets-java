@@ -6,9 +6,10 @@
 	<parent>
 		<groupId>se.fortnox.changesets</groupId>
 		<artifactId>changesets</artifactId>
-		<version>0.1.1-SNAPSHOT</version>
+		<version>0.2.1-SNAPSHOT</version>
 	</parent>
 
+	<name>Changesets Java Maven Plugin</name>
 	<artifactId>changesets-maven-plugin</artifactId>
 	<packaging>maven-plugin</packaging>
 
@@ -168,6 +169,8 @@
 							<settingsFile>src/it/settings.xml</settingsFile>
 							<addTestClassPath>true</addTestClassPath>
 							<showErrors>true</showErrors>
+							<!-- Skip these when skipping tests -->
+							<skipInvocation>${skipTests}</skipInvocation>
 							<goals>
 								<goal>clean</goal>
 								<goal>test-compile</goal>

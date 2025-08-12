@@ -1,0 +1,30 @@
+# Add changesets for Dependabot PRs
+name: Dependabot Changesets
+on:
+  pull_request: {}
+
+permissions:
+  pull-requests: read
+  contents: write
+
+jobs:
+  generate-changeset:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'FortnoxAB/changesets-java'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - uses: FortnoxAB/changesets-java-dependabot-action@main
+
+      - name: Validate
+        shell: bash
+        run: |
+          ls -l .changeset
+          git status

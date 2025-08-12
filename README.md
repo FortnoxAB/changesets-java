@@ -8,8 +8,6 @@ users recognize the ways of working and feel at home.
 
 This is it, at the moment. Stay tuned for more docs later on, thanks!
 
-
-
 ## Dependency updates
 Due to the way automated dependency update bots like Dependabot and Renovate work, there is often a large influx of automated changesets that are not easy to merge into the normal changelog. They can also be the source of an unwanted amount of noise in the changelog.
 
@@ -26,7 +24,7 @@ Dependencies that have been updated to new versions multiple times between relea
 - com.google.errorprone:error_prone_annotations: 2.34.0
 ```
 
-# Release Maven Plugin Integration
+## Release Maven Plugin Integration
 
 To delegate versioning to the Release Maven Plugin, you can use the `ChangesetsVersionPolicy` together with the `useReleasePluginIntegration` flag:
 
