@@ -11,3 +11,8 @@ updates:
       maven-plugins:
         patterns:
           - "*:*maven*plugin*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
