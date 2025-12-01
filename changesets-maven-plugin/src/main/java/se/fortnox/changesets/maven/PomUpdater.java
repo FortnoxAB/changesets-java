@@ -5,7 +5,6 @@ import org.codehaus.mojo.versions.rewriting.MutableXMLStreamReader;
 import org.slf4j.Logger;
 
 import javax.xml.stream.XMLStreamException;
-import javax.xml.transform.TransformerException;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
@@ -66,7 +65,7 @@ public class PomUpdater {
 					writer.write(newPom.getSource());
 				}
 			}
-		} catch (XMLStreamException | IOException | TransformerException e) {
+		} catch (XMLStreamException | IOException e) {
 			LOG.error("Failed to update {}", outFile, e);
 		}
 	}
