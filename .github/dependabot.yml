@@ -11,8 +11,12 @@ updates:
       maven-plugins:
         patterns:
           - "*:*maven*plugin*"
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: daily
+    cooldown:
+      default-days: 7
