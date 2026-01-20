@@ -1,4 +1,4 @@
-# Changesets
+small change# Changesets
 
 This is an attempt to bring the [changesets](https://github.com/changesets/changesets) way of working to the Java ecosystem,
 to enable easier management of changelogs and semantically versioned releases.
