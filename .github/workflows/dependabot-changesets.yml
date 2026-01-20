@@ -1,7 +1,12 @@
 # Add changesets for Dependabot PRs
 name: Dependabot Changesets
 on:
-  pull_request: {}
+  pull_request:
+    # Trigger on creation (opened) and updates (synchronize)
+    types: [opened, synchronize, reopened]
+    # Do not trigger if ONLY files in .changesets are changed
+    paths-ignore:
+      - '.changesets/**'
 
 permissions:
   contents: read
