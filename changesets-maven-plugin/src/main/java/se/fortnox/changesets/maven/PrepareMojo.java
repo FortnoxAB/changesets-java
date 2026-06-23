@@ -1,95 +1,164 @@
 package se.fortnox.changesets.maven;
 
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.logging.Logger;
-import org.semver4j.Semver;
+import se.fortnox.changesets.BumpPlanner;
+import se.fortnox.changesets.BumpPlanner.ModuleBump;
 import se.fortnox.changesets.ChangelogAggregator;
+import se.fortnox.changesets.ChangelogAggregator.ReleaseEntry;
 import se.fortnox.changesets.Changeset;
 import se.fortnox.changesets.ChangesetLocator;
+import se.fortnox.changesets.ChangesetsConfig;
 import se.fortnox.changesets.VersionCalculator;
-import se.fortnox.changesets.VersionFile;
+import se.fortnox.changesets.VersionsFile;
 
 import javax.inject.Inject;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+
+import static se.fortnox.changesets.ChangesetWriter.CHANGESET_DIR;
 
 /**
- * Applies all changesets into the changelog and calculates the new version number.
+ * Applies all changesets into the changelog, calculates new versions per module, and updates
+ * submodule poms. Runs once at the reactor root.
  * <p>
- * This would normally be the last step in preparing a release PR.
+ * Versioning strategy is read from {@code .changeset/config.json}; defaults to {@code fixed}.
  */
-@Mojo(name = "prepare", defaultPhase = LifecyclePhase.INITIALIZE)
+@Mojo(name = "prepare", defaultPhase = LifecyclePhase.INITIALIZE, aggregator = true)
 public class PrepareMojo extends AbstractMojo {
-	private final org.apache.maven.project.MavenProject project;
-	private final VersionFile versionFile;
+	private final MavenProject project;
+	private final MavenSession session;
 	private final Logger logger;
 
 	@Inject
-	public PrepareMojo(MavenProject project, VersionFile versionFile, Logger logger) {
+	public PrepareMojo(MavenProject project, MavenSession session, Logger logger) {
 		this.project = project;
-		this.versionFile = versionFile;
+		this.session = session;
 		this.logger = logger;
 	}
 
-	/*
+	/**
 	 * Set to true in order to just process changeset files, avoiding any changes to the POM(s).
 	 */
 	@Parameter(property = "useReleasePluginIntegration", defaultValue = "false")
 	protected boolean useReleasePluginIntegration = false;
 
 	public void execute() {
-		Path baseDir = project.getBasedir().toPath();
-		String packageName = project.getArtifactId();
+		Path reactorRoot = project.getBasedir().toPath();
+		Path changesetDir = reactorRoot.resolve(CHANGESET_DIR);
 
-		// Get all relevant changesets
-		ChangesetLocator changesetLocator = new ChangesetLocator(baseDir);
-		List<Changeset> changesets = changesetLocator.getChangesets(packageName);
+		ChangesetsConfig config = ChangesetsConfig.load(changesetDir);
+		logger.info("Versioning strategy: " + config.versioning());
 
+		List<Changeset> changesets = new ChangesetLocator(reactorRoot).getAllChangesets();
 		if (changesets.isEmpty()) {
-			logger.info("No changesets for package: " + packageName + " found in " + baseDir);
+			logger.info("No changesets found in " + changesetDir);
 			return;
 		}
 
-		// Calculate new version
-		String currentVersion = versionFile.currentVersion().orElse("0.0.0");;
-		String newVersion = VersionCalculator.getNewVersion(currentVersion, changesets);
-		logger.info("Old version was " + currentVersion + ", will be updated to " + newVersion);
+		Map<String, String> reactor = collectReactorVersions();
+		Map<String, ModuleBump> plan = BumpPlanner.plan(changesets, reactor, config);
 
-		// Move changesets into CHANGELOG.md
-		ChangelogAggregator changelogAggregator = new ChangelogAggregator(baseDir);
-		changelogAggregator.mergeChangesetsToChangelog(packageName, newVersion);
+		if (plan.isEmpty()) {
+			logger.info("No changesets matched any reactor module");
+			return;
+		}
 
-		// Advance to version deduced from changesets
-		versionFile.assignVersion(newVersion);
+		Map<String, String> changedVersions = new LinkedHashMap<>();
+		plan.values().stream()
+			.filter(ModuleBump::isVersionChange)
+			.forEach(bump -> changedVersions.put(bump.artifactId(), bump.newVersion()));
 
-		if(useReleasePluginIntegration) {
+		if (!changedVersions.isEmpty()) {
+			VersionsFile.write(reactorRoot, changedVersions);
+			logger.info("Wrote " + VersionsFile.locate(reactorRoot) + " with " + changedVersions.size() + " entry/entries");
+		}
+
+		writeChangelog(reactorRoot, plan);
+
+		if (useReleasePluginIntegration) {
 			logger.info("Changesets processed, but not updating POMs due to useReleasePluginIntegration being set to true.");
 			return;
 		}
 
-		// Set newVersion property to be used by versions:set
-		if (!newVersion.equals(currentVersion)) {
-			String pomVersion = Optional.ofNullable(Semver.coerce(newVersion))
-				.map(semver -> semver.withIncPatch().withPreRelease("SNAPSHOT").getVersion())
-				.orElseThrow(() -> new IllegalArgumentException("Cannot coerce \"%s\" into a semantic version.".formatted(currentVersion)));
+		applyPomVersions(plan);
+	}
 
+	private Map<String, String> collectReactorVersions() {
+		Map<String, String> reactor = new LinkedHashMap<>();
+		for (MavenProject p : session.getProjects()) {
+			reactor.put(p.getArtifactId(), stripSnapshot(p.getVersion()));
+		}
+		return reactor;
+	}
 
-			logger.info("Updating " + project.getFile() + " to " + pomVersion);
-			PomUpdater.setProjectVersion(project.getFile(), pomVersion);
+	private static String stripSnapshot(String version) {
+		if (version == null) {
+			return "0.0.0";
+		}
+		return version.endsWith("-SNAPSHOT")
+			? version.substring(0, version.length() - "-SNAPSHOT".length())
+			: version;
+	}
 
-			// Update submodules to reference the parent project with the new version
-			List<String> modules = project.getModules();
-			modules.forEach(module -> {
-				File modulePom = baseDir.resolve(module).resolve("pom.xml").toFile();
-				logger.info("Updating submodule" + modulePom + " to " + pomVersion);
-				PomUpdater.setProjectParentVersion(modulePom, pomVersion);
-			});
+	private void writeChangelog(Path reactorRoot, Map<String, ModuleBump> plan) {
+		Map<String, ReleaseEntry> entries = new LinkedHashMap<>();
+		for (ModuleBump bump : plan.values()) {
+			entries.put(bump.artifactId(), new ReleaseEntry(
+				bump.artifactId(),
+				bump.newVersion(),
+				bump.changesets()
+			));
+		}
+		new ChangelogAggregator(reactorRoot).mergeReleaseToChangelog(entries);
+	}
+
+	private void applyPomVersions(Map<String, ModuleBump> plan) {
+		Map<String, MavenProject> byArtifactId = new LinkedHashMap<>();
+		for (MavenProject p : session.getProjects()) {
+			byArtifactId.put(p.getArtifactId(), p);
+		}
+
+		String rootArtifactId = project.getArtifactId();
+		String rootNewVersion = null;
+
+		for (ModuleBump bump : plan.values()) {
+			if (!bump.isVersionChange()) {
+				continue;
+			}
+			MavenProject moduleProject = byArtifactId.get(bump.artifactId());
+			if (moduleProject == null) {
+				continue;
+			}
+			String snapshotVersion = VersionCalculator.nextDevelopmentVersion(bump.newVersion());
+			File pomFile = moduleProject.getFile();
+			logger.info("Updating " + pomFile + " to " + snapshotVersion);
+			PomUpdater.setProjectVersion(pomFile, snapshotVersion);
+
+			if (bump.artifactId().equals(rootArtifactId)) {
+				rootNewVersion = snapshotVersion;
+			}
+		}
+
+		if (rootNewVersion != null) {
+			syncParentReferencesInSubmodules(rootNewVersion);
+		}
+	}
+
+	private void syncParentReferencesInSubmodules(String rootSnapshotVersion) {
+		Path baseDir = project.getBasedir().toPath();
+		for (String module : project.getModules()) {
+			File modulePom = baseDir.resolve(module).resolve("pom.xml").toFile();
+			logger.info("Updating submodule " + modulePom + " parent ref to " + rootSnapshotVersion);
+			PomUpdater.setProjectParentVersion(modulePom, rootSnapshotVersion);
 		}
 	}
 }

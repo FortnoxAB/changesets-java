@@ -4,13 +4,17 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>se.fortnox.maven.it</groupId>
-	<artifactId>my-package</artifactId>
-	<version>2.4.5</version>
+	<artifactId>linked-multi-root</artifactId>
+	<version>1.0.0</version>
+	<packaging>pom</packaging>
 
-	<description>A simple IT verifying the basic use case.</description>
+	<description>IT: linked group, both members have changesets — bump together to highest level.</description>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
-
+	<modules>
+		<module>module-a</module>
+		<module>module-b</module>
+	</modules>
 </project>

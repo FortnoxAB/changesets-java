@@ -4,11 +4,15 @@ import com.google.common.base.Strings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static se.fortnox.changesets.ChangelogAggregator.CHANGELOG_FILE;
@@ -297,7 +301,97 @@ class ChangelogAggregatorTest {
 				  that should be kept as a single item
 				- Some dependency
 				- Third dependency
-				
+
 				""");
+	}
+
+	@Test
+	void mergeReleaseToChangelog_writesMultiModuleBlock(@TempDir Path tempDir) throws Exception {
+		ChangesetWriter writer = new ChangesetWriter(tempDir);
+		Path patchFile = writer.writeChangeset("pkg-a", Level.PATCH, "Patched A");
+		Path minorFile = writer.writeChangeset("pkg-b", Level.MINOR, "Added B feature");
+
+		Changeset patchChangeset = new Changeset("pkg-a", Level.PATCH, "Patched A", patchFile.toFile());
+		Changeset minorChangeset = new Changeset("pkg-b", Level.MINOR, "Added B feature", minorFile.toFile());
+
+		Map<String, ChangelogAggregator.ReleaseEntry> entries = new LinkedHashMap<>();
+		entries.put("pkg-a", new ChangelogAggregator.ReleaseEntry("pkg-a", "1.2.3", List.of(patchChangeset)));
+		entries.put("pkg-b", new ChangelogAggregator.ReleaseEntry("pkg-b", "2.0.0", List.of(minorChangeset)));
+
+		new ChangelogAggregator(tempDir).mergeReleaseToChangelog(entries);
+
+		assertThat(tempDir.resolve(CHANGELOG_FILE))
+			.exists()
+			.content()
+			.isEqualTo("""
+				# Changelog
+
+				## pkg-a@1.2.3
+
+				### Patch Changes
+
+				- Patched A
+
+				## pkg-b@2.0.0
+
+				### Minor Changes
+
+				- Added B feature
+
+				""");
+
+		assertThat(patchFile).doesNotExist();
+		assertThat(minorFile).doesNotExist();
+	}
+
+	@Test
+	void mergeReleaseToChangelog_prependsToExistingChangelog(@TempDir Path tempDir) throws Exception {
+		Files.writeString(tempDir.resolve(CHANGELOG_FILE), """
+			# Changelog
+
+			## pkg-a@1.0.0
+
+			### Patch Changes
+
+			- Old change
+			""", StandardOpenOption.CREATE_NEW);
+
+		ChangesetWriter writer = new ChangesetWriter(tempDir);
+		Path file = writer.writeChangeset("pkg-a", Level.MINOR, "Newer change");
+		Changeset cs = new Changeset("pkg-a", Level.MINOR, "Newer change", file.toFile());
+
+		Map<String, ChangelogAggregator.ReleaseEntry> entries = new LinkedHashMap<>();
+		entries.put("pkg-a", new ChangelogAggregator.ReleaseEntry("pkg-a", "1.1.0", List.of(cs)));
+
+		new ChangelogAggregator(tempDir).mergeReleaseToChangelog(entries);
+
+		assertThat(tempDir.resolve(CHANGELOG_FILE))
+			.content()
+			.isEqualTo("""
+				# Changelog
+
+				## pkg-a@1.1.0
+
+				### Minor Changes
+
+				- Newer change
+
+
+				## pkg-a@1.0.0
+
+				### Patch Changes
+
+				- Old change
+				""");
+	}
+
+	@Test
+	void mergeReleaseToChangelog_skipsModulesWithNoChangesets(@TempDir Path tempDir) {
+		Map<String, ChangelogAggregator.ReleaseEntry> entries = new LinkedHashMap<>();
+		entries.put("pkg-a", new ChangelogAggregator.ReleaseEntry("pkg-a", "1.0.0", List.of()));
+
+		new ChangelogAggregator(tempDir).mergeReleaseToChangelog(entries);
+
+		assertThat(tempDir.resolve(CHANGELOG_FILE)).doesNotExist();
 	}
 }

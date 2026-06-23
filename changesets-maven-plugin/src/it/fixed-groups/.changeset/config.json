@@ -1,0 +1,4 @@
+{
+  "versioning": "independent",
+  "fixed": [["module-a", "module-b"]]
+}

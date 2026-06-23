@@ -78,8 +78,95 @@ public class ChangelogAggregator {
 		return changelogFile;
 	}
 
+	/**
+	 * Merge a multi-module release into the root CHANGELOG.md: one section per module that
+	 * bumped, ordered by the {@code moduleEntries} iteration order. Consumes (deletes) all
+	 * passed-in changeset files. Modules with empty changeset lists are skipped.
+	 *
+	 * @param moduleEntries Ordered map of artifactId → (newVersion, changesets) for the release
+	 * @return Path to the written CHANGELOG.md, or the changeset dir if nothing was written
+	 */
+	public Path mergeReleaseToChangelog(Map<String, ReleaseEntry> moduleEntries) {
+		Path changesetsDir = this.baseDir.resolve(CHANGESET_DIR);
+
+		List<ReleaseEntry> nonEmpty = moduleEntries.values().stream()
+			.filter(e -> !e.changesets().isEmpty())
+			.toList();
+		if (nonEmpty.isEmpty()) {
+			LOG.info("No changesets to write to changelog in {}", this.baseDir);
+			return changesetsDir;
+		}
+
+		String changelog = generateMultiModuleChangelog(moduleEntries);
+
+		Path changelogFile;
+		try {
+			changelogFile = writeChangelog(changelog);
+		} catch (ChangelogException exception) {
+			LOG.error("Failed to update changelog at {}", changesetsDir, exception);
+			return changesetsDir;
+		}
+
+		deleteConsumedChangesets(nonEmpty);
+		return changelogFile;
+	}
+
+	public record ReleaseEntry(String artifactId, String newVersion, List<Changeset> changesets) {}
+
+	private void deleteConsumedChangesets(List<ReleaseEntry> entries) {
+		entries.stream()
+			.flatMap(e -> e.changesets().stream())
+			.map(Changeset::file)
+			.filter(java.util.Objects::nonNull)
+			.distinct()
+			.forEach(file -> {
+				try {
+					Files.deleteIfExists(file.toPath());
+				} catch (IOException e) {
+					LOG.error("Failed to delete {}", file, e);
+				}
+			});
+	}
+
+	private String generateMultiModuleChangelog(Map<String, ReleaseEntry> moduleEntries) {
+		String body = moduleEntries.values().stream()
+			.filter(e -> !e.changesets().isEmpty())
+			.map(this::generateModuleSection)
+			.collect(Collectors.joining("\n\n"));
+
+		String markdown = """
+			# Changelog
+
+			%s
+			""".formatted(body);
+
+		return MarkdownFormatter.format(markdown);
+	}
+
+	private String generateModuleSection(ReleaseEntry entry) {
+		String changes = renderChangesByLevel(entry.changesets(), "###");
+		return """
+			## %s@%s
+
+			%s""".formatted(entry.artifactId(), entry.newVersion(), changes);
+	}
+
 	private String generateChangelog(String packageName, String version, List<Changeset> changesets) {
-		String changes = changesets
+		String changes = renderChangesByLevel(changesets, "###");
+
+		String markdown = """
+			# %s
+
+			## %s
+
+			%s
+			""".formatted(packageName, version, changes);
+
+		return MarkdownFormatter.format(markdown);
+	}
+
+	private String renderChangesByLevel(List<Changeset> changesets, String headingPrefix) {
+		return changesets
 			.stream()
 			.collect(groupingBy(Changeset::level, mapping(Changeset::message, toList())))
 			.entrySet()
@@ -91,21 +178,11 @@ public class ChangelogAggregator {
 				String levelChanges = formatChangeset(level, entry.getValue());
 
 				return """
-					### %s
-					
-					%s""".formatted(levelString, levelChanges);
+					%s %s
+
+					%s""".formatted(headingPrefix, levelString, levelChanges);
 			})
 			.collect(Collectors.joining("\n\n"));
-
-		String markdown = """
-			# %s
-			
-			## %s
-			
-			%s
-			""".formatted(packageName, version, changes);
-
-		return MarkdownFormatter.format(markdown);
 	}
 
 	private String formatChangeset(Level level, List<String> changes) {
