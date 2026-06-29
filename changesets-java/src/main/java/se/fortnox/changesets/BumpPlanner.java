@@ -1,10 +1,11 @@
 package se.fortnox.changesets;
 
 import org.slf4j.Logger;
+import se.fortnox.changesets.ChangesetsConfig.Bom;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -51,7 +52,72 @@ public class BumpPlanner {
 			}
 			result.putAll(planGroup(group, groupChangesets, reactor));
 		}
+
+		if (config.bom() != null) {
+			applyBomPlan(result, known_changesets, reactor, config.bom());
+		}
+
 		return result;
+	}
+
+	/**
+	 * Applies BOM (Bill of Materials) semantics on top of the base plan:
+	 * <ul>
+	 *   <li>Removes the consumer-parent from the plan (it inherits its version from the BOM).</li>
+	 *   <li>Synthesizes/merges a BOM bump at the max level of any tracked module bump,
+	 *       combined with any explicit BOM-targeted changesets.</li>
+	 *   <li>The BOM bump's {@code changesets} list contains only the explicit changesets
+	 *       targeting the BOM, so changelog rendering shows them naturally; the synthesized
+	 *       part is purely a version-bump signal.</li>
+	 * </ul>
+	 */
+	private static void applyBomPlan(
+		Map<String, ModuleBump> result,
+		List<Changeset> allChangesets,
+		Map<String, String> reactor,
+		Bom bom
+	) {
+		String bomModule = bom.module();
+		String consumerParent = bom.consumerParent();
+
+		if (consumerParent != null) {
+			result.remove(consumerParent);
+		}
+
+		EnumSet<Level> trackedLevels = EnumSet.noneOf(Level.class);
+		for (ModuleBump bump : result.values()) {
+			if (bump.artifactId().equals(bomModule)) {
+				continue;
+			}
+			if (!bump.isVersionChange()) {
+				continue;
+			}
+			for (Changeset c : bump.changesets()) {
+				trackedLevels.add(c.level());
+			}
+		}
+
+		List<Changeset> bomExplicit = allChangesets.stream()
+			.filter(c -> c.packageName().equals(bomModule))
+			.toList();
+
+		if (trackedLevels.isEmpty() && bomExplicit.isEmpty()) {
+			return;
+		}
+
+		List<Changeset> combinedForVersionCalc = new ArrayList<>(bomExplicit);
+		for (Level level : trackedLevels) {
+			combinedForVersionCalc.add(new Changeset(bomModule, level, "", null));
+		}
+
+		String bomCurrent = reactor.get(bomModule);
+		if (bomCurrent == null) {
+			throw new IllegalArgumentException(
+				"bom.module '" + bomModule + "' is not present in the reactor");
+		}
+		String bomNew = VersionCalculator.getNewVersion(bomCurrent, combinedForVersionCalc);
+
+		result.put(bomModule, new ModuleBump(bomModule, bomCurrent, bomNew, bomExplicit));
 	}
 
 	private static List<Changeset> filterKnownModules(List<Changeset> changesets, Set<String> known) {

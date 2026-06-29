@@ -386,6 +386,102 @@ class ChangelogAggregatorTest {
 	}
 
 	@Test
+	void mergeReleaseToChangelog_bomMode_rendersNestedUnderConsumerParentHeader(@TempDir Path tempDir) throws Exception {
+		ChangesetWriter writer = new ChangesetWriter(tempDir);
+		Path aFile = writer.writeChangeset("starter-a", Level.MINOR, "Added feature A");
+		Path bFile = writer.writeChangeset("starter-b", Level.PATCH, "Fixed B");
+
+		Changeset aChange = new Changeset("starter-a", Level.MINOR, "Added feature A", aFile.toFile());
+		Changeset bChange = new Changeset("starter-b", Level.PATCH, "Fixed B", bFile.toFile());
+
+		Map<String, ChangelogAggregator.ReleaseEntry> entries = new LinkedHashMap<>();
+		entries.put("starter-a", new ChangelogAggregator.ReleaseEntry("starter-a", "0.4.0", List.of(aChange)));
+		entries.put("starter-b", new ChangelogAggregator.ReleaseEntry("starter-b", "0.3.3", List.of(bChange)));
+		entries.put("bom-dep", new ChangelogAggregator.ReleaseEntry("bom-dep", "0.3.3", List.of()));
+
+		Map<String, String> pinned = new LinkedHashMap<>();
+		pinned.put("starter-a", "0.4.0");
+		pinned.put("starter-b", "0.3.3");
+		var bomCtx = new ChangelogAggregator.BomContext("consumer-parent", "0.3.3", "bom-dep", pinned);
+
+		new ChangelogAggregator(tempDir).mergeReleaseToChangelog(entries, bomCtx);
+
+		assertThat(tempDir.resolve(CHANGELOG_FILE))
+			.exists()
+			.content()
+			.isEqualTo("""
+				# Changelog
+
+				## consumer-parent@0.3.3
+
+				### starter-a@0.4.0
+
+				#### Minor Changes
+
+				- Added feature A
+
+				### starter-b@0.3.3
+
+				#### Patch Changes
+
+				- Fixed B
+
+				### bom-dep@0.3.3
+
+				#### Pinned version updates
+
+				- starter-a@0.4.0
+				- starter-b@0.3.3
+
+				""");
+	}
+
+	@Test
+	void mergeReleaseToChangelog_bomMode_includesExplicitBomChangesetsAboveSyncedVersions(@TempDir Path tempDir) throws Exception {
+		ChangesetWriter writer = new ChangesetWriter(tempDir);
+		Path aFile = writer.writeChangeset("starter-a", Level.PATCH, "Fixed A");
+		Path bomFile = writer.writeChangeset("bom-dep", Level.MAJOR, "Removed deprecated managed dep");
+
+		Changeset aChange = new Changeset("starter-a", Level.PATCH, "Fixed A", aFile.toFile());
+		Changeset bomChange = new Changeset("bom-dep", Level.MAJOR, "Removed deprecated managed dep", bomFile.toFile());
+
+		Map<String, ChangelogAggregator.ReleaseEntry> entries = new LinkedHashMap<>();
+		entries.put("starter-a", new ChangelogAggregator.ReleaseEntry("starter-a", "0.4.1", List.of(aChange)));
+		entries.put("bom-dep", new ChangelogAggregator.ReleaseEntry("bom-dep", "1.0.0", List.of(bomChange)));
+
+		Map<String, String> pinned = new LinkedHashMap<>();
+		pinned.put("starter-a", "0.4.1");
+		var bomCtx = new ChangelogAggregator.BomContext("bom-dep", "1.0.0", "bom-dep", pinned);
+
+		new ChangelogAggregator(tempDir).mergeReleaseToChangelog(entries, bomCtx);
+
+		assertThat(tempDir.resolve(CHANGELOG_FILE))
+			.content()
+			.isEqualTo("""
+				# Changelog
+
+				## bom-dep@1.0.0
+
+				### starter-a@0.4.1
+
+				#### Patch Changes
+
+				- Fixed A
+
+				### bom-dep@1.0.0
+
+				#### Major Changes
+
+				- Removed deprecated managed dep
+
+				#### Pinned version updates
+
+				- starter-a@0.4.1
+
+				""");
+	}
+
+	@Test
 	void mergeReleaseToChangelog_skipsModulesWithNoChangesets(@TempDir Path tempDir) {
 		Map<String, ChangelogAggregator.ReleaseEntry> entries = new LinkedHashMap<>();
 		entries.put("pkg-a", new ChangelogAggregator.ReleaseEntry("pkg-a", "1.0.0", List.of()));

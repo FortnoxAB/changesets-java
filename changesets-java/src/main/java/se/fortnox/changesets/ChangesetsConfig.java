@@ -19,7 +19,8 @@ public record ChangesetsConfig(
 	VersioningStrategy versioning,
 	List<List<String>> linked,
 	List<List<String>> fixed,
-	ChangelogMode changelog
+	ChangelogMode changelog,
+	Bom bom
 ) {
 	private static final Logger LOG = getLogger(ChangesetsConfig.class);
 	public static final String CONFIG_FILE = "config.json";
@@ -33,7 +34,7 @@ public record ChangesetsConfig(
 	}
 
 	public static ChangesetsConfig defaults() {
-		return new ChangesetsConfig(VersioningStrategy.FIXED, List.of(), List.of(), ChangelogMode.ROOT);
+		return new ChangesetsConfig(VersioningStrategy.FIXED, List.of(), List.of(), ChangelogMode.ROOT, null);
 	}
 
 	/**
@@ -98,6 +99,24 @@ public record ChangesetsConfig(
 				case "root" -> ROOT;
 				default -> throw new IllegalArgumentException("Unknown changelog mode: " + value);
 			};
+		}
+	}
+
+	/**
+	 * Optional BOM (Bill of Materials) configuration. When set, the BOM module's
+	 * {@code <properties>} that pin sibling module versions are rewritten on every
+	 * prepare, and the BOM itself is auto-bumped at the max level of any tracked
+	 * module's bump. An optional {@code consumerParent} provides the changelog header
+	 * artifactId; it inherits its version from the BOM via Maven parent inheritance.
+	 */
+	public record Bom(String module, String consumerParent) {
+		public Bom {
+			if (module == null || module.isBlank()) {
+				throw new IllegalArgumentException("bom.module must be set");
+			}
+			if (consumerParent != null && consumerParent.isBlank()) {
+				consumerParent = null;
+			}
 		}
 	}
 }

@@ -47,6 +47,43 @@ For `independent` (or `linked` / `fixed` sub-groups) to actually update individu
 must declare its own `<version>` in its `pom.xml`. Submodules that inherit `<version>` from the parent only bump together
 with the parent.
 
+## BOM (Bill of Materials) support
+
+If your reactor contains a BOM — a `pom`-packaged module whose `<dependencyManagement>` pins sibling modules' versions via
+`<properties>` (the Spring Boot convention) — opt in via `.changeset/config.json`:
+
+```json
+{
+  "versioning": "independent",
+  "bom": {
+    "module": "fortnox-spring-boot-dependencies",
+    "consumerParent": "fortnox-spring-boot-starter-parent"
+  }
+}
+```
+
+Behavior:
+
+- **The BOM auto-bumps** at the max level of any tracked module's bump (any reactor module that pins through the BOM's
+  `<dependencyManagement>`). Explicit changesets targeting the BOM still work — they combine with the synthesized level.
+- **The BOM's `<properties>`** that pin sibling versions are rewritten on `prepare` (to the next `-SNAPSHOT`) and on
+  `release` (to the release version). The mapping is discovered by walking the BOM's `<dependencyManagement>`; you don't
+  have to name properties by any convention.
+- **`consumerParent`** (optional) is the module a consumer sets as their `<parent>`. It typically has no `<version>` of its
+  own and inherits from the BOM via Maven parent inheritance. When set, it is *excluded* from the plan (no own bump) and is
+  used as the changelog header so consumers see entries named after the artifact they actually pin. Its `<parent>`
+  reference is updated when the BOM bumps. Validation: the artifactId must exist in the reactor, and if it declares its own
+  `<version>` it must match the BOM's.
+- **Changelog rendering** in BOM mode collapses to a single top-level release header, with one sub-section per bumped
+  module (including the BOM, which gets a synthesized `Pinned version updates` block listing the new sibling versions).
+
+### Releasing a starter without cutting a BOM release
+
+Pass `-DskipBom=true` to `changesets:prepare` to bypass BOM behavior for that invocation. The starters bump as in plain
+independent mode, the BOM's pom is left untouched (version *and* pinned properties), and the changelog falls back to the
+standard per-module sections. The `bom` block in `.changeset/config.json` stays in place — `skipBom` is a per-run override,
+not a config change. Use it when you want to ship a quick starter patch between full BOM releases.
+
 ## How `prepare` and `release` interact
 
 `changesets:prepare` (aggregator goal, runs once at the reactor root) reads all changesets in `.changeset/`, computes a new

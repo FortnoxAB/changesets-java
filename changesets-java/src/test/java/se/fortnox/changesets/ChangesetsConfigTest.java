@@ -31,12 +31,13 @@ class ChangesetsConfigTest {
 
 		@Test
 		void canonicalConstructorFillsNullsWithDefaults() {
-			var config = new ChangesetsConfig(null, null, null, null);
+			var config = new ChangesetsConfig(null, null, null, null, null);
 
 			assertThat(config.versioning()).isEqualTo(FIXED);
 			assertThat(config.linked()).isEmpty();
 			assertThat(config.fixed()).isEmpty();
 			assertThat(config.changelog()).isEqualTo(ROOT);
+			assertThat(config.bom()).isNull();
 		}
 	}
 
@@ -59,7 +60,11 @@ class ChangesetsConfigTest {
 				  "versioning": "independent",
 				  "linked": [["pkg-a", "pkg-b"]],
 				  "fixed": [["pkg-c", "pkg-d"]],
-				  "changelog": "root"
+				  "changelog": "root",
+				  "bom": {
+				    "module": "pkg-bom",
+				    "consumerParent": "pkg-parent"
+				  }
 				}
 				""");
 
@@ -69,6 +74,23 @@ class ChangesetsConfigTest {
 			assertThat(config.linked()).containsExactly(List.of("pkg-a", "pkg-b"));
 			assertThat(config.fixed()).containsExactly(List.of("pkg-c", "pkg-d"));
 			assertThat(config.changelog()).isEqualTo(ROOT);
+			assertThat(config.bom().module()).isEqualTo("pkg-bom");
+			assertThat(config.bom().consumerParent()).isEqualTo("pkg-parent");
+		}
+
+		@Test
+		void parsesBomWithoutConsumerParent() throws IOException {
+			Files.writeString(tempDir.resolve("config.json"), """
+				{
+				  "versioning": "independent",
+				  "bom": { "module": "pkg-bom" }
+				}
+				""");
+
+			var config = ChangesetsConfig.load(tempDir);
+
+			assertThat(config.bom().module()).isEqualTo("pkg-bom");
+			assertThat(config.bom().consumerParent()).isNull();
 		}
 
 		@Test
@@ -103,7 +125,8 @@ class ChangesetsConfigTest {
 				INDEPENDENT,
 				List.of(List.of("pkg-a", "pkg-b"), List.of("pkg-a", "pkg-c")),
 				List.of(),
-				ROOT))
+				ROOT,
+				null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("pkg-a");
 		}
@@ -114,7 +137,8 @@ class ChangesetsConfigTest {
 				INDEPENDENT,
 				List.of(List.of("pkg-a", "pkg-b")),
 				List.of(List.of("pkg-a", "pkg-c")),
-				ROOT))
+				ROOT,
+				null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("pkg-a");
 		}
@@ -125,7 +149,8 @@ class ChangesetsConfigTest {
 				INDEPENDENT,
 				List.of(List.of("pkg-a", "pkg-b")),
 				List.of(List.of("pkg-c", "pkg-d")),
-				ROOT);
+				ROOT,
+				null);
 
 			assertThat(config.linked()).hasSize(1);
 			assertThat(config.fixed()).hasSize(1);

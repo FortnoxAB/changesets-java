@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -87,17 +88,30 @@ public class ChangelogAggregator {
 	 * @return Path to the written CHANGELOG.md, or the changeset dir if nothing was written
 	 */
 	public Path mergeReleaseToChangelog(Map<String, ReleaseEntry> moduleEntries) {
+		return mergeReleaseToChangelog(moduleEntries, null);
+	}
+
+	/**
+	 * BOM-aware variant. When {@code bomContext} is non-null, emits a single top-level
+	 * release header (consumer-parent + BOM version) with each bumped module rendered
+	 * as a nested sub-section. The BOM's section additionally lists its pinned-version
+	 * updates.
+	 */
+	public Path mergeReleaseToChangelog(Map<String, ReleaseEntry> moduleEntries, BomContext bomContext) {
 		Path changesetsDir = this.baseDir.resolve(CHANGESET_DIR);
 
-		List<ReleaseEntry> nonEmpty = moduleEntries.values().stream()
-			.filter(e -> !e.changesets().isEmpty())
+		List<ReleaseEntry> renderable = moduleEntries.values().stream()
+			.filter(e -> !e.changesets().isEmpty()
+				|| (bomContext != null && e.artifactId().equals(bomContext.bomArtifactId())))
 			.toList();
-		if (nonEmpty.isEmpty()) {
+		if (renderable.isEmpty()) {
 			LOG.info("No changesets to write to changelog in {}", this.baseDir);
 			return changesetsDir;
 		}
 
-		String changelog = generateMultiModuleChangelog(moduleEntries);
+		String changelog = bomContext == null
+			? generateMultiModuleChangelog(moduleEntries)
+			: generateBomChangelog(moduleEntries, bomContext);
 
 		Path changelogFile;
 		try {
@@ -107,11 +121,30 @@ public class ChangelogAggregator {
 			return changesetsDir;
 		}
 
-		deleteConsumedChangesets(nonEmpty);
+		deleteConsumedChangesets(moduleEntries.values().stream()
+			.filter(e -> !e.changesets().isEmpty())
+			.toList());
 		return changelogFile;
 	}
 
 	public record ReleaseEntry(String artifactId, String newVersion, List<Changeset> changesets) {}
+
+	/**
+	 * Context for BOM-aware changelog rendering.
+	 *
+	 * @param headerArtifactId The artifactId shown in the top-level {@code ##} release header
+	 *                         (consumer-parent if configured, otherwise the BOM itself).
+	 * @param headerVersion    The version shown in the top-level header (the BOM's version).
+	 * @param bomArtifactId    The BOM's artifactId — its section gets the pinned-versions block.
+	 * @param pinnedUpdates    Ordered map of pinned module artifactId → new version, as
+	 *                         applied to the BOM's {@code <properties>}.
+	 */
+	public record BomContext(
+		String headerArtifactId,
+		String headerVersion,
+		String bomArtifactId,
+		Map<String, String> pinnedUpdates
+	) {}
 
 	private void deleteConsumedChangesets(List<ReleaseEntry> entries) {
 		entries.stream()
@@ -149,6 +182,61 @@ public class ChangelogAggregator {
 			## %s@%s
 
 			%s""".formatted(entry.artifactId(), entry.newVersion(), changes);
+	}
+
+	private String generateBomChangelog(Map<String, ReleaseEntry> moduleEntries, BomContext bom) {
+		List<String> sections = new ArrayList<>();
+		for (ReleaseEntry entry : moduleEntries.values()) {
+			if (entry.artifactId().equals(bom.bomArtifactId())) {
+				continue;
+			}
+			if (entry.changesets().isEmpty()) {
+				continue;
+			}
+			sections.add(generateBomNestedSection(entry));
+		}
+
+		ReleaseEntry bomEntry = moduleEntries.get(bom.bomArtifactId());
+		if (bomEntry != null) {
+			sections.add(generateBomOwnSection(bomEntry, bom));
+		}
+
+		String body = String.join("\n\n", sections);
+
+		String markdown = """
+			# Changelog
+
+			## %s@%s
+
+			%s
+			""".formatted(bom.headerArtifactId(), bom.headerVersion(), body);
+
+		return MarkdownFormatter.format(markdown);
+	}
+
+	private String generateBomNestedSection(ReleaseEntry entry) {
+		String changes = renderChangesByLevel(entry.changesets(), "####");
+		return """
+			### %s@%s
+
+			%s""".formatted(entry.artifactId(), entry.newVersion(), changes);
+	}
+
+	private String generateBomOwnSection(ReleaseEntry bomEntry, BomContext bom) {
+		StringBuilder section = new StringBuilder();
+		section.append("### ").append(bomEntry.artifactId()).append('@').append(bomEntry.newVersion()).append("\n\n");
+
+		if (!bomEntry.changesets().isEmpty()) {
+			section.append(renderChangesByLevel(bomEntry.changesets(), "####")).append("\n\n");
+		}
+
+		if (!bom.pinnedUpdates().isEmpty()) {
+			section.append("#### Pinned version updates\n\n");
+			for (Map.Entry<String, String> e : bom.pinnedUpdates().entrySet()) {
+				section.append("- ").append(e.getKey()).append('@').append(e.getValue()).append('\n');
+			}
+		}
+		return section.toString();
 	}
 
 	private String generateChangelog(String packageName, String version, List<Changeset> changesets) {

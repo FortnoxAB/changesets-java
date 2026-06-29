@@ -74,7 +74,7 @@ class BumpPlannerTest {
 			var changes = List.of(
 				changeset("m1", Level.MINOR),
 				changeset("m2", Level.PATCH));
-			var config = new ChangesetsConfig(INDEPENDENT, List.of(), List.of(), ROOT);
+			var config = new ChangesetsConfig(INDEPENDENT, List.of(), List.of(), ROOT, null);
 
 			var result = BumpPlanner.plan(changes, reactor, config);
 
@@ -86,7 +86,7 @@ class BumpPlannerTest {
 		void modulesWithoutChangesetsAreOmitted() {
 			var reactor = Map.of("m1", "1.0.0", "m2", "1.0.0");
 			var changes = List.of(changeset("m1", Level.PATCH));
-			var config = new ChangesetsConfig(INDEPENDENT, List.of(), List.of(), ROOT);
+			var config = new ChangesetsConfig(INDEPENDENT, List.of(), List.of(), ROOT, null);
 
 			var result = BumpPlanner.plan(changes, reactor, config);
 
@@ -109,7 +109,8 @@ class BumpPlannerTest {
 				INDEPENDENT,
 				List.of(List.of("pkg-a", "pkg-b")),
 				List.of(),
-				ROOT);
+				ROOT,
+				null);
 
 			var result = BumpPlanner.plan(changes, reactor, config);
 
@@ -126,7 +127,8 @@ class BumpPlannerTest {
 				INDEPENDENT,
 				List.of(List.of("pkg-a", "pkg-b")),
 				List.of(),
-				ROOT);
+				ROOT,
+				null);
 
 			var result = BumpPlanner.plan(changes, reactor, config);
 
@@ -142,7 +144,8 @@ class BumpPlannerTest {
 				INDEPENDENT,
 				List.of(List.of("pkg-a", "pkg-b")),
 				List.of(),
-				ROOT);
+				ROOT,
+				null);
 
 			var result = BumpPlanner.plan(changes, reactor, config);
 
@@ -161,7 +164,8 @@ class BumpPlannerTest {
 				INDEPENDENT,
 				List.of(),
 				List.of(List.of("pkg-a", "pkg-b")),
-				ROOT);
+				ROOT,
+				null);
 
 			var result = BumpPlanner.plan(changes, reactor, config);
 
@@ -185,12 +189,105 @@ class BumpPlannerTest {
 	}
 
 	@Nested
+	class BomBumping {
+		@Test
+		void bomBumpsAtMaxLevelOfTrackedModules() {
+			var reactor = Map.of("bom", "1.0.0", "starter-a", "1.0.0", "starter-b", "1.0.0");
+			var changes = List.of(
+				changeset("starter-a", Level.PATCH),
+				changeset("starter-b", Level.MINOR));
+			var config = new ChangesetsConfig(
+				INDEPENDENT,
+				List.of(),
+				List.of(),
+				ROOT,
+				new ChangesetsConfig.Bom("bom", null));
+
+			var result = BumpPlanner.plan(changes, reactor, config);
+
+			assertThat(result.get("bom").newVersion()).isEqualTo("1.1.0");
+			assertThat(result.get("bom").changesets()).isEmpty();
+			assertThat(result.get("starter-a").newVersion()).isEqualTo("1.0.1");
+			assertThat(result.get("starter-b").newVersion()).isEqualTo("1.1.0");
+		}
+
+		@Test
+		void bomKeepsExplicitChangesets() {
+			var reactor = Map.of("bom", "1.0.0", "starter-a", "1.0.0");
+			var changes = List.of(
+				changeset("starter-a", Level.PATCH),
+				changeset("bom", Level.MAJOR));
+			var config = new ChangesetsConfig(
+				INDEPENDENT,
+				List.of(),
+				List.of(),
+				ROOT,
+				new ChangesetsConfig.Bom("bom", null));
+
+			var result = BumpPlanner.plan(changes, reactor, config);
+
+			assertThat(result.get("bom").newVersion()).isEqualTo("2.0.0");
+			assertThat(result.get("bom").changesets()).hasSize(1);
+			assertThat(result.get("bom").changesets().get(0).level()).isEqualTo(Level.MAJOR);
+		}
+
+		@Test
+		void consumerParentIsRemovedFromPlan() {
+			var reactor = Map.of("bom", "1.0.0", "consumer-parent", "1.0.0", "starter-a", "1.0.0");
+			var changes = List.of(changeset("starter-a", Level.PATCH));
+			var config = new ChangesetsConfig(
+				INDEPENDENT,
+				List.of(),
+				List.of(),
+				ROOT,
+				new ChangesetsConfig.Bom("bom", "consumer-parent"));
+
+			var result = BumpPlanner.plan(changes, reactor, config);
+
+			assertThat(result).doesNotContainKey("consumer-parent");
+			assertThat(result).containsKeys("bom", "starter-a");
+		}
+
+		@Test
+		void bomDoesNothingWhenNoTrackedModulesBumpAndNoExplicitChangesets() {
+			var reactor = Map.of("bom", "1.0.0", "starter-a", "1.0.0");
+			var changes = List.<Changeset>of();
+			var config = new ChangesetsConfig(
+				INDEPENDENT,
+				List.of(),
+				List.of(),
+				ROOT,
+				new ChangesetsConfig.Bom("bom", null));
+
+			var result = BumpPlanner.plan(changes, reactor, config);
+
+			assertThat(result).isEmpty();
+		}
+
+		@Test
+		void dependencyOnlyChangesetDoesNotBumpBom() {
+			var reactor = Map.of("bom", "1.0.0", "starter-a", "1.0.0");
+			var changes = List.of(changeset("starter-a", Level.DEPENDENCY));
+			var config = new ChangesetsConfig(
+				INDEPENDENT,
+				List.of(),
+				List.of(),
+				ROOT,
+				new ChangesetsConfig.Bom("bom", null));
+
+			var result = BumpPlanner.plan(changes, reactor, config);
+
+			assertThat(result).containsOnlyKeys("starter-a");
+		}
+	}
+
+	@Nested
 	class DependencyOnly {
 		@Test
 		void dependencyOnlyChangesetEmitsBumpWithUnchangedVersion() {
 			var reactor = Map.of("m1", "1.0.0");
 			var changes = List.of(changeset("m1", Level.DEPENDENCY));
-			var config = new ChangesetsConfig(INDEPENDENT, List.of(), List.of(), ROOT);
+			var config = new ChangesetsConfig(INDEPENDENT, List.of(), List.of(), ROOT, null);
 
 			var result = BumpPlanner.plan(changes, reactor, config);
 
