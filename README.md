@@ -84,6 +84,31 @@ independent mode, the BOM's pom is left untouched (version *and* pinned properti
 standard per-module sections. The `bom` block in `.changeset/config.json` stays in place — `skipBom` is a per-run override,
 not a config change. Use it when you want to ship a quick starter patch between full BOM releases.
 
+## Per-module changelogs
+
+By default the release block is prepended to a single `CHANGELOG.md` at the reactor root. With `independent` versioning you
+can instead emit one `CHANGELOG.md` per bumped submodule by setting `changelog: "module"`:
+
+```json
+{
+  "versioning": "independent",
+  "changelog": "module"
+}
+```
+
+Behavior:
+
+- Each module that bumps gets its own `CHANGELOG.md` next to its `pom.xml`, containing only that module's changes.
+- Modules without changesets for the release are skipped — no empty file is created.
+- No reactor-root `CHANGELOG.md` is written. Any existing root `CHANGELOG.md` is left untouched.
+- If a [BOM](#bom-bill-of-materials-support) is also configured, the reactor-root `CHANGELOG.md` is *additionally* written as
+  a rollup summary — one entry per bumped module under a single `consumer-parent@<bomVersion>` header, with each module's
+  changes nested below — so consumers see a dependabot-style overview of what moved in that BOM release while the
+  authoritative per-module history lives next to each module.
+
+`changelog: "module"` requires `versioning: "independent"`; combining it with `fixed` is a config validation error, since all
+modules would share one version anyway. Omitting `changelog` keeps the previous behavior (a single root `CHANGELOG.md`).
+
 ## How `prepare` and `release` interact
 
 `changesets:prepare` (aggregator goal, runs once at the reactor root) reads all changesets in `.changeset/`, computes a new
@@ -148,3 +173,31 @@ Goals should then be invoked as `changesets:prepare release:prepare release:perf
 With `useReleasePluginIntegration=true`, `changesets:prepare` writes `.changeset/VERSIONS` but does not modify any poms.
 The maven-release-plugin then consults `ChangesetsVersionPolicy`, which reads `VERSIONS` and resolves the release / next
 development version *per module* by `artifactId`. Modules not present in `VERSIONS` keep their current version unchanged.
+
+## Configuration reference
+
+All settings below live in `.changeset/config.json` at the reactor root. The file itself is optional — omit it and the
+defaults apply.
+
+| Field                  | Type                 | Required | Default   | Allowed values                | Description                                                                                                                                  |
+|------------------------|----------------------|----------|-----------|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `versioning`           | string               | No       | `fixed`   | `fixed`, `independent`        | Whether all reactor modules share one version (`fixed`) or each module tracks its own (`independent`).                                       |
+| `linked`               | array of string arrays | No     | `[]`      | Reactor `artifactId`s          | Groups whose members bump together to the same new version *when at least one member has a changeset*. Requires `versioning: independent`.   |
+| `fixed`                | array of string arrays | No     | `[]`      | Reactor `artifactId`s          | Groups whose members always bump together, even members without their own changesets. Requires `versioning: independent`.                    |
+| `changelog`            | string               | No       | `root`    | `root`, `module`              | `root` writes one aggregated `CHANGELOG.md` at the reactor root. `module` writes one `CHANGELOG.md` per bumped submodule; requires `versioning: independent`. With a BOM also configured, a root rollup `CHANGELOG.md` is written in addition. |
+| `bom.module`           | string               | Yes¹     | —         | Reactor `artifactId`           | The BOM module that pins sibling versions via `<properties>` in its `<dependencyManagement>`. Required when the `bom` block is present.      |
+| `bom.consumerParent`   | string               | No       | *(unset)* | Reactor `artifactId`           | The pom-packaged module consumers set as their `<parent>`. Excluded from the bump plan; used as the changelog header. Must inherit its `<version>` from the BOM. |
+
+¹ Required only when the `bom` block is present; the entire `bom` block is optional.
+
+The same `artifactId` cannot appear in more than one `linked`/`fixed` group; that is a config validation error.
+
+### CLI / plugin parameters
+
+These flags are passed to `changesets:prepare` on the command line (or via `<configuration>`); they are *not* part of
+`config.json`.
+
+| Parameter                     | Type    | Default | Description                                                                                                                                              |
+|-------------------------------|---------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `useReleasePluginIntegration` | boolean | `false` | When `true`, `prepare` writes `.changeset/VERSIONS` but does not modify any poms — version updates are delegated to maven-release-plugin via `ChangesetsVersionPolicy`. |
+| `skipBom`                     | boolean | `false` | Per-invocation override that ignores the `bom` block in `config.json`. The BOM is not auto-bumped, its `<properties>` are not rewritten, and the changelog falls back to plain multi-module mode. |
