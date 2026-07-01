@@ -64,6 +64,16 @@ class BumpPlannerTest {
 
 			assertThat(result.values()).allMatch(b -> b.newVersion().equals("2.0.1"));
 		}
+
+		@Test
+		void releaseVersionOutranksSnapshotAtSameNumericVersion() {
+			var reactor = Map.of("root", "1.0.0-SNAPSHOT", "m1", "1.0.0", "m2", "1.0.0-SNAPSHOT");
+			var changes = List.of(changeset("m1", Level.PATCH));
+
+			var result = BumpPlanner.plan(changes, reactor, ChangesetsConfig.defaults());
+
+			assertThat(result.values()).allMatch(b -> b.newVersion().equals("1.0.1"));
+		}
 	}
 
 	@Nested
