@@ -19,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static se.fortnox.changesets.ChangesetWriter.CHANGESET_DIR;
 import static se.fortnox.changesets.VersionCalculator.nextDevelopmentVersion;
@@ -28,10 +30,13 @@ import static se.fortnox.changesets.VersionCalculator.nextDevelopmentVersion;
  * from {@code .changeset/VERSIONS} (written by {@code changesets:prepare}).
  * <p>
  * The maven-release-plugin's {@code VersionPolicyRequest} only carries {@code version} and the
- * reactor {@code workingDirectory} — no artifactId — so this policy identifies the calling
- * module by matching {@code request.getVersion()} against the reactor projects' current versions.
- * If exactly one reactor project has that version, its artifactId is used as the VERSIONS key.
- * Otherwise (no match, or ambiguous match) the policy falls back to the request's version.
+ * reactor {@code workingDirectory} — no artifactId — so this policy identifies the calling module
+ * by matching {@code request.getVersion()} first against reactor pom versions (map-release-versions
+ * phase) and then, if that fails, against VERSIONS values (map-development-versions phase, where
+ * release-plugin passes the just-computed release version). If exactly one candidate is found, its
+ * artifactId keys into VERSIONS. On ambiguous matches, the policy accepts the ambiguity if all
+ * candidates share the same target; otherwise it leaves the version unchanged with an actionable
+ * warning.
  */
 @Component(role = VersionPolicy.class,
 	hint = "changesets",
@@ -61,8 +66,19 @@ public class ChangesetsVersionPolicy implements VersionPolicy {
 		return new VersionPolicyResult().setVersion(
 			lookup(request)
 				.map(v -> nextDevelopmentVersion(stripSnapshot(v)))
-				// modules not tracked in VERSIONS are left unchanged
-				.orElseGet(request::getVersion));
+				// Unmapped: return a SNAPSHOT so release-plugin's dev-version loop terminates.
+				// If the request is already a SNAPSHOT (typical: unmapped module retaining its
+				// pre-release version), leave it as-is. If it's not (typical: release-plugin's
+				// dev-version phase passing us the just-computed release version for a module
+				// we can no longer identify), bump to next-dev.
+				.orElseGet(() -> ensureSnapshot(request.getVersion())));
+	}
+
+	private static String ensureSnapshot(String version) {
+		if (version == null) {
+			return nextDevelopmentVersion("0.0.0");
+		}
+		return version.endsWith("-SNAPSHOT") ? version : nextDevelopmentVersion(version);
 	}
 
 	private Optional<String> lookup(VersionPolicyRequest request) {
@@ -72,41 +88,69 @@ public class ChangesetsVersionPolicy implements VersionPolicy {
 			return Optional.empty();
 		}
 		Map<String, String> versions = VersionsFile.read(reactorRoot.get());
-		Optional<String> artifactId = identifyModule(request, versions);
-		if (artifactId.isEmpty()) {
+		List<String> candidates = candidateArtifactIds(request, versions);
+		if (candidates.isEmpty()) {
 			logger.info("No VERSIONS match for version {}; leaving version unchanged", request.getVersion());
 			return Optional.empty();
 		}
-		String mapped = versions.get(artifactId.get());
-		logger.info("Resolved release version for {} from VERSIONS: {}", artifactId.get(), mapped);
-		return Optional.of(mapped);
+		if (candidates.size() == 1) {
+			String mapped = versions.get(candidates.get(0));
+			logger.info("Resolved release version for {} from VERSIONS: {}", candidates.get(0), mapped);
+			return Optional.of(mapped);
+		}
+		// Ambiguous: multiple reactor modules share the same current version. If they all map to
+		// the same target in VERSIONS (typical for BOM / fixed / linked groups that bump together),
+		// that target is unambiguous even if the artifactId is not.
+		Set<String> distinctTargets = candidates.stream().map(versions::get).collect(Collectors.toSet());
+		if (distinctTargets.size() == 1) {
+			String mapped = distinctTargets.iterator().next();
+			logger.info("Ambiguous artifact for version {} but all candidates map to {}; using it. Candidates: {}",
+				request.getVersion(), mapped, candidates);
+			return Optional.of(mapped);
+		}
+		logger.warn(
+			"Ambiguous VERSIONS lookup for version {}: candidates {} map to differing targets {}; " +
+				"leaving version unchanged. Combining maven-release-plugin with independent versioning " +
+				"is not supported — use `changesets:prepare` + `changesets:release` instead.",
+			request.getVersion(), candidates, distinctTargets);
+		return Optional.empty();
 	}
 
 	/**
-	 * Identify which reactor module the request is for by matching {@code request.getVersion()}
-	 * against reactor projects' current versions, restricted to modules present in VERSIONS.
-	 * Returns empty when no unique match exists.
+	 * Reactor artifactIds present in VERSIONS that could correspond to the requested version.
+	 * <p>
+	 * Tries two matches, in order of specificity:
+	 * <ol>
+	 *   <li>Reactor project's current pom version equals the requested version — the normal case
+	 *       during the map-release-versions phase.</li>
+	 *   <li>VERSIONS value equals the requested version — needed for the map-development-versions
+	 *       phase, where release-plugin passes us the just-computed release version (which is the
+	 *       VERSIONS value from the prior phase) rather than the module's current pom version.</li>
+	 * </ol>
 	 */
-	private Optional<String> identifyModule(VersionPolicyRequest request, Map<String, String> versions) {
+	private List<String> candidateArtifactIds(VersionPolicyRequest request, Map<String, String> versions) {
 		if (session == null || session.getProjects() == null) {
-			return Optional.empty();
+			return List.of();
 		}
 		String requested = request.getVersion();
+		if (requested == null) {
+			return List.of();
+		}
 		Map<String, MavenProject> byArtifactId = new LinkedHashMap<>();
 		for (MavenProject p : session.getProjects()) {
 			byArtifactId.put(p.getArtifactId(), p);
 		}
-		List<String> candidates = versions.keySet().stream()
+		List<String> byCurrentPomVersion = versions.keySet().stream()
 			.filter(byArtifactId::containsKey)
-			.filter(a -> requested != null && requested.equals(byArtifactId.get(a).getVersion()))
+			.filter(a -> requested.equals(byArtifactId.get(a).getVersion()))
 			.toList();
-		if (candidates.size() == 1) {
-			return Optional.of(candidates.get(0));
+		if (!byCurrentPomVersion.isEmpty()) {
+			return byCurrentPomVersion;
 		}
-		if (candidates.size() > 1) {
-			logger.warn("Ambiguous VERSIONS lookup for version {}: matches {}", requested, candidates);
-		}
-		return Optional.empty();
+		return versions.entrySet().stream()
+			.filter(e -> requested.equals(e.getValue()))
+			.map(Map.Entry::getKey)
+			.toList();
 	}
 
 	private Path reactorRootHint(VersionPolicyRequest request) {

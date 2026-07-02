@@ -131,8 +131,8 @@ class ChangesetsVersionPolicyTest {
 		}
 
 		@Test
-		void fallsBackWhenTwoReactorModulesShareCurrentVersion() throws Exception {
-			// Ambiguous — two candidate modules; policy must not guess.
+		void fallsBackWhenAmbiguousCandidatesMapToDifferentTargets() throws Exception {
+			// Two candidates share current version but map to different releases — genuinely ambiguous.
 			writeVersions("""
 				module-a=9.9.9
 				module-b=8.8.8
@@ -145,6 +145,70 @@ class ChangesetsVersionPolicyTest {
 				.getReleaseVersion(request("1.0.0-SNAPSHOT"));
 
 			assertThat(result.getVersion()).isEqualTo("1.0.0");
+		}
+
+		@Test
+		void identifiesModuleByVersionsValueForDevVersionPhaseAfterRelease() throws Exception {
+			// release:prepare's map-development-versions phase passes the RELEASE version (not the
+			// current SNAPSHOT) as request.version, because release-plugin uses the just-computed
+			// release value as the base for the next-dev calculation. The reactor pom is still at
+			// its pre-release SNAPSHOT, so matching by pom version fails — but VERSIONS *value*
+			// still identifies the module.
+			writeVersions("""
+				module-a=2.1.0
+				module-b=3.0.5
+				""");
+			MavenProject root = project("root", "1.0.0-SNAPSHOT", reactorRoot);
+			MavenProject moduleA = project("module-a", "2.1.1-SNAPSHOT", reactorRoot.resolve("module-a"));
+			MavenProject moduleB = project("module-b", "3.0.6-SNAPSHOT", reactorRoot.resolve("module-b"));
+
+			// Simulate release-plugin's dev-version phase for module-a: request.version = 2.1.0
+			var devA = policy(root, session(List.of(root, moduleA, moduleB)))
+				.getDevelopmentVersion(request("2.1.0"));
+			// And for module-b: request.version = 3.0.5
+			var devB = policy(root, session(List.of(root, moduleA, moduleB)))
+				.getDevelopmentVersion(request("3.0.5"));
+
+			assertThat(devA.getVersion()).isEqualTo("2.1.1-SNAPSHOT");
+			assertThat(devB.getVersion()).isEqualTo("3.0.6-SNAPSHOT");
+		}
+
+		@Test
+		void devVersionFallbackYieldsSnapshotEvenWhenUnidentifiable() throws Exception {
+			// Unmapped module in dev-version phase: previously the fallback returned request.version
+			// unchanged, which is a release version and caused release-plugin's dev-version loop to
+			// spin forever waiting for a SNAPSHOT. The fallback must now always produce a SNAPSHOT.
+			writeVersions("other=9.9.9\n");
+			MavenProject root = project("root", "1.0.0-SNAPSHOT", reactorRoot);
+
+			// release-plugin passes a non-SNAPSHOT release version here.
+			var result = policy(root, session(List.of(root)))
+				.getDevelopmentVersion(request("1.0.0"));
+
+			assertThat(result.getVersion()).isEqualTo("1.0.1-SNAPSHOT");
+		}
+
+		@Test
+		void resolvesWhenAmbiguousCandidatesShareTheSameTarget() throws Exception {
+			// BOM / fixed-group style: many modules at the same current version all bumped
+			// to the same release. The artifactId is ambiguous but the target isn't.
+			writeVersions("""
+				module-a=0.5.0
+				module-b=0.5.0
+				module-c=0.5.0
+				""");
+			MavenProject root = project("root", "1.0.0-SNAPSHOT", reactorRoot);
+			MavenProject moduleA = project("module-a", "0.3.2-SNAPSHOT", reactorRoot.resolve("module-a"));
+			MavenProject moduleB = project("module-b", "0.3.2-SNAPSHOT", reactorRoot.resolve("module-b"));
+			MavenProject moduleC = project("module-c", "0.3.2-SNAPSHOT", reactorRoot.resolve("module-c"));
+
+			var release = policy(root, session(List.of(root, moduleA, moduleB, moduleC)))
+				.getReleaseVersion(request("0.3.2-SNAPSHOT"));
+			var dev = policy(root, session(List.of(root, moduleA, moduleB, moduleC)))
+				.getDevelopmentVersion(request("0.3.2-SNAPSHOT"));
+
+			assertThat(release.getVersion()).isEqualTo("0.5.0");
+			assertThat(dev.getVersion()).isEqualTo("0.5.1-SNAPSHOT");
 		}
 	}
 
