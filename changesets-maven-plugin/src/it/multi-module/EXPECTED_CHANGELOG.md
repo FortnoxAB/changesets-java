@@ -1,6 +1,6 @@
-# multi-module
+# Changelog
 
-## 2.0.0
+## multi-module@2.0.0
 
 ### Major Changes
 

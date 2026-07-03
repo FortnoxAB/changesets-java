@@ -21,6 +21,24 @@ public class ChangesetLocator {
 	}
 
 	public List<Changeset> getChangesets(String packageName) {
+		List<Changeset> matchingChangesets = getAllChangesets().stream()
+			.filter(changeset -> {
+				boolean matchesPackage = changeset.packageName().equals(packageName);
+				if (!matchesPackage) {
+					LOG.info("Found {}, but {} did not match requested packagename {}", changeset.file(), changeset.packageName(), packageName);
+				}
+				return matchesPackage;
+			})
+			.toList();
+
+		if (matchingChangesets.isEmpty()) {
+			LOG.info("No changesets matching package {} found in {}", packageName, this.baseDir.resolve(CHANGESET_DIR));
+		}
+
+		return matchingChangesets;
+	}
+
+	public List<Changeset> getAllChangesets() {
 		Path changesetsDir = this.baseDir.resolve(CHANGESET_DIR);
 		File[] array = changesetsDir.toFile().listFiles((dir, name) -> name.endsWith(".md"));
 
@@ -29,26 +47,9 @@ public class ChangesetLocator {
 			return new ArrayList<>();
 		}
 
-		List<File> changesets = Arrays.stream(Objects.requireNonNull(array))
+		return Arrays.stream(Objects.requireNonNull(array))
 			.sorted()
-			.toList();
-
-		List<Changeset> matchingChangesets = changesets.stream()
 			.flatMap(file -> ChangesetParser.parseFile(file).stream())
-			.filter(changeset -> {
-				boolean matchesPackage = changeset.packageName().equals(packageName);
-				if (!matchesPackage) {
-					LOG.info("Found {}, but {} did not match requested packagename {}", changeset.file(), changeset.packageName(), packageName);
-				}
-
-				return matchesPackage;
-			})
 			.toList();
-
-		if (matchingChangesets.isEmpty()) {
-			LOG.info("No changesets matching package {} found in {}", packageName, changesetsDir);
-		}
-
-		return matchingChangesets;
 	}
 }
