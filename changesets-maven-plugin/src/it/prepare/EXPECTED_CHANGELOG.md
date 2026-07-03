@@ -1,6 +1,6 @@
-# my-package
+# Changelog
 
-## 2.5.0
+## my-package@2.5.0
 
 ### Minor Changes
 
