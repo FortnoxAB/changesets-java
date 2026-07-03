@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>se.fortnox.maven.it</groupId>
+	<artifactId>fixed-root</artifactId>
+	<version>1.0.0</version>
+	<packaging>pom</packaging>
+
+	<description>IT: fixed sub-group inside independent mode. One changeset bumps all members of the group.</description>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+	<modules>
+		<module>module-a</module>
+		<module>module-b</module>
+		<module>module-c</module>
+	</modules>
+</project>
