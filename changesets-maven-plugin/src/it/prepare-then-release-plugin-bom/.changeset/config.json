@@ -1,0 +1,7 @@
+{
+  "versioning": "independent",
+  "bom": {
+    "module": "bom",
+    "consumerParent": "consumer-parent"
+  }
+}

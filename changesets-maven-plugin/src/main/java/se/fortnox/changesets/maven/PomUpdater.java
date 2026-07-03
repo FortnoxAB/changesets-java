@@ -40,6 +40,23 @@ public class PomUpdater {
 	}
 
 	/**
+	 * Set a property value in the {@code <properties>} section of a pom file.
+	 *
+	 * @param outFile  The pom file to update
+	 * @param property The property name
+	 * @param value    The new property value
+	 */
+	public static void setProperty(File outFile, String property, String value) {
+		updatePom(outFile, newPom -> {
+			try {
+				PomHelper.setPropertyVersion(newPom, null, property, value);
+			} catch (XMLStreamException e) {
+				LOG.error("Failed to update property {} in {}", property, outFile, e);
+			}
+		});
+	}
+
+	/**
 	 * Set parent project version in a pom file
 	 *
 	 * @param outFile    The pom file to update
