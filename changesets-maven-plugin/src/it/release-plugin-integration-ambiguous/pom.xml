@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>se.fortnox.maven.it</groupId>
+	<artifactId>rpi-ambiguous-root</artifactId>
+	<version>1.0.0-SNAPSHOT</version>
+	<packaging>pom</packaging>
+
+	<description>IT: useReleasePluginIntegration + independent versioning + two modules sharing
+		the same current version but bumping to DIFFERENT targets. This is the one case where the
+		policy cannot disambiguate. The IT asserts graceful degradation: no prompt, no crash, a
+		clear actionable warning in the log, and poms left unchanged so the user can rerun with the
+		recommended option-#4 flow.</description>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+
+	<modules>
+		<module>module-a</module>
+		<module>module-b</module>
+	</modules>
+
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-release-plugin</artifactId>
+				<version>3.1.1</version>
+				<configuration>
+					<projectVersionPolicyId>changesets</projectVersionPolicyId>
+					<pushChanges>false</pushChanges>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>se.fortnox.changesets</groupId>
+						<artifactId>changesets-maven-plugin</artifactId>
+						<version>@project.version@</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+		</plugins>
+	</build>
+</project>

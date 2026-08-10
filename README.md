@@ -119,6 +119,10 @@ artifactId), updates each affected submodule's pom to the next `*-SNAPSHOT`, and
 `changesets:release` reads `.changeset/VERSIONS` and writes each module's pom to its release version. The `.changeset/VERSIONS`
 file is the handoff between the two goals.
 
+> **Upgrading from an earlier version:** the previous single-file `.changeset/VERSION` (uppercase, no `S`) is no longer read
+> or written. The current version is now taken from each module's `pom.xml` directly, and the prepare→release handoff lives
+> in `.changeset/VERSIONS`. If you have a leftover `.changeset/VERSION` file, it is unused and safe to delete.
+
 ## Dependency updates
 Due to the way automated dependency update bots like Dependabot and Renovate work, there is often a large influx of automated changesets that are not easy to merge into the normal changelog. They can also be the source of an unwanted amount of noise in the changelog.
 
@@ -137,9 +141,24 @@ Dependencies that have been updated to new versions multiple times between relea
 
 ## Release Maven Plugin Integration
 
-To delegate versioning to the Release Maven Plugin, you can use the `ChangesetsVersionPolicy` together with the `useReleasePluginIntegration` flag:
+You can hand versioning off to the maven-release-plugin by wiring in `ChangesetsVersionPolicy`.
 
-```
+### When to use it
+
+**Recommended:** fixed versioning (the default) — single-module or multi-module. Every module bumps together to one
+version, one tag, one release commit. 
+
+**Not recommended:** independent versioning. Maven-release-plugin's model is *release the whole reactor atomically* —
+every reactor module gets a release version, a tag, and a next-dev bump, whether it was targeted by a changeset or not.
+That fights the point of `independent`, where you only want to release modules that actually changed. For independent
+versioning, use plain `changesets:prepare` + `changesets:release` (see [How `prepare` and `release` interact](#how-prepare-and-release-interact))
+and release-plugin is not recommended.
+
+### Setup
+
+Configure both plugins in the reactor POM:
+
+```xml
 <build>
   <plugins>
     <plugin>
@@ -147,7 +166,7 @@ To delegate versioning to the Release Maven Plugin, you can use the `ChangesetsV
       <artifactId>changesets-maven-plugin</artifactId>
       <version>${changesets.plugin.version}</version>
       <configuration>
-        <useReleasePluginIntegration>true</useReleasePluginIntegration> <!-- Disables version updates in prepare goal -->
+        <useReleasePluginIntegration>true</useReleasePluginIntegration>
       </configuration>
     </plugin>
     <plugin>
@@ -156,6 +175,7 @@ To delegate versioning to the Release Maven Plugin, you can use the `ChangesetsV
       <configuration>
         <projectVersionPolicyId>changesets</projectVersionPolicyId>
         <tagNameFormat>v@{project.version}</tagNameFormat>
+        <interactive>false</interactive>
       </configuration>
       <dependencies>
         <dependency>
@@ -166,38 +186,26 @@ To delegate versioning to the Release Maven Plugin, you can use the `ChangesetsV
       </dependencies>
     </plugin>
   </plugins>
+</build>
 ```
 
-Goals should then be invoked as `changesets:prepare release:prepare release:perform`. `changesets:release` should *not* be used.
+### Flow
 
-With `useReleasePluginIntegration=true`, `changesets:prepare` writes `.changeset/VERSIONS` but does not modify any poms.
-The maven-release-plugin then consults `ChangesetsVersionPolicy`, which reads `VERSIONS` and resolves the release / next
-development version *per module* by `artifactId`. Modules not present in `VERSIONS` keep their current version unchanged.
+```
+mvn changesets:prepare
+git add . && git commit -m "chore: prepare release"
+mvn release:prepare release:perform
+```
+
+With `useReleasePluginIntegration=true`, `changesets:prepare` writes `.changeset/VERSIONS` and `CHANGELOG.md` but
+does not touch any poms. `ChangesetsVersionPolicy` then reads `VERSIONS` and tells release-plugin the release +
+next-dev version per module. All pom rewrites happen in release-plugin's own commit — one clean "release X" commit
+in history instead of two.
+
+`changesets:release` is *not* used in this flow.
+
+If you'd rather have `changesets:prepare` update the poms itself (e.g. to inspect them before triggering the
+release-plugin), omit `useReleasePluginIntegration`. The trade-off is an extra "chore: prepare release" commit
+before `release:prepare` runs.
 
 ## Configuration reference
-
-All settings below live in `.changeset/config.json` at the reactor root. The file itself is optional — omit it and the
-defaults apply.
-
-| Field                  | Type                 | Required | Default   | Allowed values                | Description                                                                                                                                  |
-|------------------------|----------------------|----------|-----------|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `versioning`           | string               | No       | `fixed`   | `fixed`, `independent`        | Whether all reactor modules share one version (`fixed`) or each module tracks its own (`independent`).                                       |
-| `linked`               | array of string arrays | No     | `[]`      | Reactor `artifactId`s          | Groups whose members bump together to the same new version *when at least one member has a changeset*. Requires `versioning: independent`.   |
-| `fixed`                | array of string arrays | No     | `[]`      | Reactor `artifactId`s          | Groups whose members always bump together, even members without their own changesets. Requires `versioning: independent`.                    |
-| `changelog`            | string               | No       | `root`    | `root`, `module`              | `root` writes one aggregated `CHANGELOG.md` at the reactor root. `module` writes one `CHANGELOG.md` per bumped submodule; requires `versioning: independent`. With a BOM also configured, a root rollup `CHANGELOG.md` is written in addition. |
-| `bom.module`           | string               | Yes¹     | —         | Reactor `artifactId`           | The BOM module that pins sibling versions via `<properties>` in its `<dependencyManagement>`. Required when the `bom` block is present.      |
-| `bom.consumerParent`   | string               | No       | *(unset)* | Reactor `artifactId`           | The pom-packaged module consumers set as their `<parent>`. Excluded from the bump plan; used as the changelog header. Must inherit its `<version>` from the BOM. |
-
-¹ Required only when the `bom` block is present; the entire `bom` block is optional.
-
-The same `artifactId` cannot appear in more than one `linked`/`fixed` group; that is a config validation error.
-
-### CLI / plugin parameters
-
-These flags are passed to `changesets:prepare` on the command line (or via `<configuration>`); they are *not* part of
-`config.json`.
-
-| Parameter                     | Type    | Default | Description                                                                                                                                              |
-|-------------------------------|---------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `useReleasePluginIntegration` | boolean | `false` | When `true`, `prepare` writes `.changeset/VERSIONS` but does not modify any poms — version updates are delegated to maven-release-plugin via `ChangesetsVersionPolicy`. |
-| `skipBom`                     | boolean | `false` | Per-invocation override that ignores the `bom` block in `config.json`. The BOM is not auto-bumped, its `<properties>` are not rewritten, and the changelog falls back to plain multi-module mode. |

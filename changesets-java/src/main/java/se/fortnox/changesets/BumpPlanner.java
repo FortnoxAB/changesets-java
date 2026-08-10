@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -201,17 +200,21 @@ public class BumpPlanner {
 	}
 
 	private static String highestVersion(Collection<String> versions) {
-		TreeMap<org.semver4j.Semver, String> sorted = new TreeMap<>();
+		String maxRaw = null;
+		org.semver4j.Semver maxSemver = null;
 		for (String v : versions) {
 			org.semver4j.Semver semver = Optional.ofNullable(org.semver4j.Semver.coerce(v))
-				.map(org.semver4j.Semver::withClearedPreReleaseAndBuild)
+				.map(org.semver4j.Semver::withClearedBuild)
 				.orElseThrow(() -> new IllegalArgumentException("Cannot coerce \"%s\" into a semantic version.".formatted(v)));
-			sorted.put(semver, v);
+			if (maxSemver == null || semver.compareTo(maxSemver) > 0) {
+				maxSemver = semver;
+				maxRaw = v;
+			}
 		}
-		if (sorted.isEmpty()) {
+		if (maxRaw == null) {
 			throw new IllegalStateException("Group has no resolvable members in reactor");
 		}
-		return sorted.lastEntry().getValue();
+		return maxRaw;
 	}
 
 	private enum GroupKind { FIXED, LINKED, INDIVIDUAL }
