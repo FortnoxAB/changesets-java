@@ -206,5 +206,4 @@ in history instead of two.
 If you'd rather have `changesets:prepare` update the poms itself (e.g. to inspect them before triggering the
 release-plugin), omit `useReleasePluginIntegration`. The trade-off is an extra "chore: prepare release" commit
 before `release:prepare` runs.
-
 ## Configuration reference
