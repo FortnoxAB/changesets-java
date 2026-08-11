@@ -100,9 +100,8 @@ Behavior:
 
 - Each module that bumps gets its own `CHANGELOG.md` next to its `pom.xml`, containing only that module's changes.
 - Modules without changesets for the release are skipped — no empty file is created.
-- No reactor-root `CHANGELOG.md` is written. Any existing root `CHANGELOG.md` is left untouched.
-- If a [BOM](#bom-bill-of-materials-support) is also configured, the reactor-root `CHANGELOG.md` is *additionally* written as
-  a rollup summary — one entry per bumped module under a single `consumer-parent@<bomVersion>` header, with each module's
+- When no [BOM](#bom-bill-of-materials-support) is configured, no reactor-root `CHANGELOG.md` is written; any existing root `CHANGELOG.md` is left untouched.
+- If a BOM is configured, the reactor-root `CHANGELOG.md` is additionally written as a rollup summary — one entry per bumped module under a single `consumer-parent@<bomVersion>` header, with each module's
   changes nested below — so consumers see a dependabot-style overview of what moved in that BOM release while the
   authoritative per-module history lives next to each module.
 
