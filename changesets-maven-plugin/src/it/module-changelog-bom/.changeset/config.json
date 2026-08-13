@@ -1,0 +1,8 @@
+{
+  "versioning": "independent",
+  "changelog": "module",
+  "bom": {
+    "module": "bom",
+    "consumerParent": "consumer-parent"
+  }
+}

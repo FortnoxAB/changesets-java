@@ -31,6 +31,7 @@ public record ChangesetsConfig(
 		fixed = fixed == null ? List.of() : List.copyOf(fixed);
 		changelog = changelog == null ? ChangelogMode.ROOT : changelog;
 		validateGroupsAreDisjoint(linked, fixed);
+		validateChangelogModeAgainstVersioning(versioning, changelog);
 	}
 
 	public static ChangesetsConfig defaults() {
@@ -52,6 +53,14 @@ public record ChangesetsConfig(
 		} catch (IOException e) {
 			LOG.error("Failed to read changesets config at {}, falling back to defaults", configFile, e);
 			return defaults();
+		}
+	}
+
+	private static void validateChangelogModeAgainstVersioning(VersioningStrategy versioning, ChangelogMode changelog) {
+		if (changelog == ChangelogMode.MODULE && versioning == VersioningStrategy.FIXED) {
+			throw new IllegalArgumentException(
+				"changelog mode 'module' requires versioning 'independent'; "
+					+ "with 'fixed' versioning all modules share a single version, so per-module changelogs are not meaningful");
 		}
 	}
 
@@ -87,8 +96,20 @@ public record ChangesetsConfig(
 		}
 	}
 
+	/**
+	 * Where release changelog entries are written.
+	 *
+	 * <ul>
+	 *   <li>{@code ROOT} (default): a single aggregated {@code CHANGELOG.md} at the reactor root.</li>
+	 *   <li>{@code MODULE}: each bumped module gets its own {@code CHANGELOG.md} next to its
+	 *       {@code pom.xml}. When a BOM is configured, the reactor-root {@code CHANGELOG.md} is
+	 *       additionally written as a rollup summarising the per-module bumps for that BOM version.
+	 *       Requires {@code versioning: independent}.</li>
+	 * </ul>
+	 */
 	public enum ChangelogMode {
-		@JsonProperty("root") ROOT;
+		@JsonProperty("root") ROOT,
+		@JsonProperty("module") MODULE;
 
 		@JsonCreator
 		public static ChangelogMode fromString(String value) {
@@ -97,6 +118,7 @@ public record ChangesetsConfig(
 			}
 			return switch (value.toLowerCase()) {
 				case "root" -> ROOT;
+				case "module" -> MODULE;
 				default -> throw new IllegalArgumentException("Unknown changelog mode: " + value);
 			};
 		}

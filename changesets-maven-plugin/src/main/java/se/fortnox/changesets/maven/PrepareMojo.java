@@ -17,6 +17,7 @@ import se.fortnox.changesets.Changeset;
 import se.fortnox.changesets.ChangesetLocator;
 import se.fortnox.changesets.ChangesetsConfig;
 import se.fortnox.changesets.ChangesetsConfig.Bom;
+import se.fortnox.changesets.ChangesetsConfig.ChangelogMode;
 import se.fortnox.changesets.VersionCalculator;
 import se.fortnox.changesets.VersionsFile;
 
@@ -100,7 +101,7 @@ public class PrepareMojo extends AbstractMojo {
 			logger.info("Wrote " + VersionsFile.locate(reactorRoot) + " with " + changedVersions.size() + " entry/entries");
 		}
 
-		writeChangelog(reactorRoot, plan, config.bom(), byArtifactId);
+		writeChangelog(reactorRoot, plan, config, byArtifactId);
 
 		if (useReleasePluginIntegration) {
 			logger.info("Changesets processed, but not updating POMs due to useReleasePluginIntegration being set to true.");
@@ -163,7 +164,7 @@ public class PrepareMojo extends AbstractMojo {
 		return reactor;
 	}
 
-	private void writeChangelog(Path reactorRoot, Map<String, ModuleBump> plan, Bom bom, Map<String, MavenProject> byArtifactId) {
+	private void writeChangelog(Path reactorRoot, Map<String, ModuleBump> plan, ChangesetsConfig config, Map<String, MavenProject> byArtifactId) {
 		Map<String, ReleaseEntry> entries = new LinkedHashMap<>();
 		for (ModuleBump bump : plan.values()) {
 			entries.put(bump.artifactId(), new ReleaseEntry(
@@ -173,6 +174,7 @@ public class PrepareMojo extends AbstractMojo {
 			));
 		}
 
+		Bom bom = config.bom();
 		BomContext bomContext = null;
 		if (bom != null && plan.containsKey(bom.module())) {
 			ModuleBump bomBump = plan.get(bom.module());
@@ -181,7 +183,31 @@ public class PrepareMojo extends AbstractMojo {
 			bomContext = new BomContext(headerArtifactId, bomBump.newVersion(), bom.module(), pinnedUpdates);
 		}
 
+		if (config.changelog() == ChangelogMode.MODULE) {
+			writePerModuleChangelogs(entries, byArtifactId);
+			if (bomContext != null) {
+				new ChangelogAggregator(reactorRoot).mergeReleaseToChangelog(entries, bomContext);
+			}
+			return;
+		}
+
 		new ChangelogAggregator(reactorRoot).mergeReleaseToChangelog(entries, bomContext);
+	}
+
+	private void writePerModuleChangelogs(Map<String, ReleaseEntry> entries, Map<String, MavenProject> byArtifactId) {
+		for (ReleaseEntry entry : entries.values()) {
+			if (entry.changesets().isEmpty()) {
+				continue;
+			}
+			MavenProject moduleProject = byArtifactId.get(entry.artifactId());
+			if (moduleProject == null) {
+				continue;
+			}
+			Path moduleDir = moduleProject.getBasedir().toPath();
+			Map<String, ReleaseEntry> single = new LinkedHashMap<>();
+			single.put(entry.artifactId(), entry);
+			new ChangelogAggregator(moduleDir).mergeReleaseToChangelog(single);
+		}
 	}
 
 	private Map<String, String> collectPinnedUpdates(Bom bom, Map<String, ModuleBump> plan, Map<String, MavenProject> byArtifactId) {

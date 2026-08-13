@@ -84,6 +84,30 @@ independent mode, the BOM's pom is left untouched (version *and* pinned properti
 standard per-module sections. The `bom` block in `.changeset/config.json` stays in place — `skipBom` is a per-run override,
 not a config change. Use it when you want to ship a quick starter patch between full BOM releases.
 
+## Per-module changelogs
+
+By default the release block is prepended to a single `CHANGELOG.md` at the reactor root. With `independent` versioning you
+can instead emit one `CHANGELOG.md` per bumped submodule by setting `changelog: "module"`:
+
+```json
+{
+  "versioning": "independent",
+  "changelog": "module"
+}
+```
+
+Behavior:
+
+- Each module that bumps gets its own `CHANGELOG.md` next to its `pom.xml`, containing only that module's changes.
+- Modules without changesets for the release are skipped — no empty file is created.
+- When no [BOM](#bom-bill-of-materials-support) is configured, no reactor-root `CHANGELOG.md` is written; any existing root `CHANGELOG.md` is left untouched.
+- If a BOM is configured, the reactor-root `CHANGELOG.md` is additionally written as a rollup summary — one entry per bumped module under a single `consumer-parent@<bomVersion>` header, with each module's
+  changes nested below — so consumers see a dependabot-style overview of what moved in that BOM release while the
+  authoritative per-module history lives next to each module.
+
+`changelog: "module"` requires `versioning: "independent"`; combining it with `fixed` is a config validation error, since all
+modules would share one version anyway. Omitting `changelog` keeps the previous behavior (a single root `CHANGELOG.md`).
+
 ## How `prepare` and `release` interact
 
 `changesets:prepare` (aggregator goal, runs once at the reactor root) reads all changesets in `.changeset/`, computes a new
@@ -182,3 +206,4 @@ in history instead of two.
 If you'd rather have `changesets:prepare` update the poms itself (e.g. to inspect them before triggering the
 release-plugin), omit `useReleasePluginIntegration`. The trade-off is an extra "chore: prepare release" commit
 before `release:prepare` runs.
+## Configuration reference
