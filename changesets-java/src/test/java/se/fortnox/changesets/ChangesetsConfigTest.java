@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static se.fortnox.changesets.ChangesetsConfig.ChangelogMode.MODULE;
 import static se.fortnox.changesets.ChangesetsConfig.ChangelogMode.ROOT;
 import static se.fortnox.changesets.ChangesetsConfig.VersioningStrategy.FIXED;
 import static se.fortnox.changesets.ChangesetsConfig.VersioningStrategy.INDEPENDENT;
@@ -108,6 +109,20 @@ class ChangesetsConfigTest {
 		}
 
 		@Test
+		void parsesModuleChangelogMode() throws IOException {
+			Files.writeString(tempDir.resolve("config.json"), """
+				{
+				  "versioning": "independent",
+				  "changelog": "module"
+				}
+				""");
+
+			var config = ChangesetsConfig.load(tempDir);
+
+			assertThat(config.changelog()).isEqualTo(MODULE);
+		}
+
+		@Test
 		void returnsDefaultsOnMalformedJson() throws IOException {
 			Files.writeString(tempDir.resolve("config.json"), "not json {");
 
@@ -141,6 +156,20 @@ class ChangesetsConfigTest {
 				null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("pkg-a");
+		}
+
+		@Test
+		void rejectsModuleChangelogWithFixedVersioning() {
+			assertThatThrownBy(() -> new ChangesetsConfig(FIXED, List.of(), List.of(), MODULE, null))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("module");
+		}
+
+		@Test
+		void allowsModuleChangelogWithIndependentVersioning() {
+			var config = new ChangesetsConfig(INDEPENDENT, List.of(), List.of(), MODULE, null);
+
+			assertThat(config.changelog()).isEqualTo(MODULE);
 		}
 
 		@Test
