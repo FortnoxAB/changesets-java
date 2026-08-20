@@ -1,5 +1,24 @@
 # changesets
 
+## 0.4.0
+
+### Minor Changes
+
+- Add support for per-module changelogs, so each sub-module in a multi-module Maven project can maintain its own
+  `CHANGELOG.md` instead of sharing a single aggregated one.
+
+### Patch Changes
+
+- - actions/setup-java: 5.4.0
+- - ch.qos.logback:logback-classic: 1.5.25
+- - ch.qos.logback:logback-core: 1.5.25
+- - com.fasterxml.jackson.dataformat:jackson-dataformat-yaml: 2.21.0
+- - dependabot/fetch-metadata: 2.5.0
+- - github/codeql-action: 4.31.10
+- - org.junit.jupiter:junit-jupiter-api, org.junit.jupiter:junit-jupiter-params: 6.0.2
+- - org.mockito:mockito-core: 5.21.0
+- - zizmorcore/zizmor-action: 0.6.2
+
 ## 0.3.0
 
 ### Minor Changes
